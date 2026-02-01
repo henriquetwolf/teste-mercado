@@ -12,7 +12,7 @@ const getAccessToken = async () => {
     .single();
 
   if (!configData?.value?.accessToken) {
-    throw new Error("Access Token não configurado.");
+    throw new Error("Access Token não configurado no painel administrativo.");
   }
   return configData.value.accessToken;
 };
@@ -25,7 +25,6 @@ export const createPreference = async (course: any, user: any) => {
     const accessToken = await getAccessToken();
 
     // Nota: Usamos query params simplificados para o back_url
-    // O Mercado Pago adicionará: collection_id, collection_status, payment_id, status, external_reference, etc.
     const baseUrl = window.location.origin + window.location.pathname + (window.location.pathname.endsWith('/') ? '' : '/') + '#/my-courses';
 
     const response = await fetch('https://api.mercadopago.com/checkout/preferences', {
@@ -84,7 +83,14 @@ export const verifyPaymentStatus = async (paymentId: string) => {
       }
     });
 
-    if (!response.ok) return { approved: false, error: 'Pagamento não encontrado na API do Mercado Pago' };
+    if (!response.ok) {
+      const errorData = await response.json();
+      return { 
+        approved: false, 
+        error: errorData.message || 'Pagamento não encontrado na API do Mercado Pago',
+        status: 'error'
+      };
+    }
 
     const paymentData = await response.json();
     
@@ -92,22 +98,22 @@ export const verifyPaymentStatus = async (paymentId: string) => {
       approved: paymentData.status === 'approved',
       status: paymentData.status,
       external_reference: paymentData.external_reference,
-      amount: paymentData.transaction_amount
+      amount: paymentData.transaction_amount,
+      id: paymentData.id
     };
   } catch (error) {
     console.error("Erro na verificação do pagamento:", error);
-    return { approved: false, error: 'Falha na comunicação com o gateway' };
+    return { approved: false, error: 'Falha na comunicação com o gateway', status: 'offline' };
   }
 };
 
 /**
- * BUSCA INTEGRADA: Lista os pagamentos recentes da conta do Mercado Pago
+ * Busca pagamentos recentes para tentar reconciliar compras pendentes
  */
 export const searchPayments = async (limit = 50) => {
   try {
     const accessToken = await getAccessToken();
     
-    // Busca pagamentos ordenados pelos mais recentes
     const response = await fetch(`https://api.mercadopago.com/v1/payments/search?sort=date_created&criteria=desc&limit=${limit}`, {
       method: 'GET',
       headers: {
@@ -118,7 +124,7 @@ export const searchPayments = async (limit = 50) => {
     if (!response.ok) throw new Error("Não foi possível buscar os pagamentos.");
 
     const data = await response.json();
-    return data.results; // Array de pagamentos
+    return data.results || [];
   } catch (error) {
     console.error("Erro ao buscar pagamentos no MP:", error);
     return [];
