@@ -16,7 +16,12 @@ import {
   Settings,
   ArrowLeft,
   Key,
-  Lock
+  Lock,
+  Trash2,
+  PlayCircle,
+  Clock,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 const SidebarBtn = ({ active, onClick, icon, label }: any) => (
@@ -163,25 +168,99 @@ export default function InstructorDashboard() {
       setEditingCourse(data);
       setActiveTab('edit-course');
     } catch (err: any) {
-      alert("Erro ao criar curso. Verifique se a coluna instructor_id existe na tabela courses.");
+      alert("Erro ao criar curso.");
     } finally {
       setIsSaving(false);
     }
   };
 
-  // ... (Funções de edição de curso simplificadas para o exemplo)
-  const startEditing = (course: any) => { setEditingCourse({ ...course }); setActiveTab('edit-course'); };
+  const startEditing = (course: any) => { 
+    setEditingCourse({ ...course, modules: course.modules || [] }); 
+    setActiveTab('edit-course'); 
+  };
+
   const handleSaveCourseContent = async () => {
+    if (!editingCourse) return;
     setIsSaving(true);
     try {
       const { error } = await supabase.from('courses').update({ 
-        modules: editingCourse.modules, title: editingCourse.title, price: editingCourse.price 
+        modules: editingCourse.modules, 
+        title: editingCourse.title, 
+        price: parseFloat(editingCourse.price),
+        description: editingCourse.description
       }).eq('id', editingCourse.id);
+      
       if (error) throw error;
-      alert("Curso atualizado!");
+      alert("Curso atualizado com sucesso!");
       loadInstructorData();
       setActiveTab('courses');
-    } catch (err: any) { alert("Erro ao salvar: " + err.message); } finally { setIsSaving(false); }
+    } catch (err: any) { 
+      alert("Erro ao salvar: " + err.message); 
+    } finally { 
+      setIsSaving(false); 
+    }
+  };
+
+  const addModule = () => {
+    const newModule = {
+      id: Math.random().toString(36).substr(2, 9),
+      title: 'Novo Módulo',
+      lessons: []
+    };
+    setEditingCourse({ ...editingCourse, modules: [...editingCourse.modules, newModule] });
+  };
+
+  const removeModule = (moduleId: string) => {
+    setEditingCourse({
+      ...editingCourse,
+      modules: editingCourse.modules.filter((m: any) => m.id !== moduleId)
+    });
+  };
+
+  const addLesson = (moduleId: string) => {
+    const newLesson = {
+      id: Math.random().toString(36).substr(2, 9),
+      title: 'Nova Aula',
+      duration: '00:00',
+      videoUrl: '',
+      description: ''
+    };
+    setEditingCourse({
+      ...editingCourse,
+      modules: editingCourse.modules.map((m: any) => 
+        m.id === moduleId ? { ...m, lessons: [...m.lessons, newLesson] } : m
+      )
+    });
+  };
+
+  const removeLesson = (moduleId: string, lessonId: string) => {
+    setEditingCourse({
+      ...editingCourse,
+      modules: editingCourse.modules.map((m: any) => 
+        m.id === moduleId ? { ...m, lessons: m.lessons.filter((l: any) => l.id !== lessonId) } : m
+      )
+    });
+  };
+
+  const updateModuleTitle = (moduleId: string, title: string) => {
+    setEditingCourse({
+      ...editingCourse,
+      modules: editingCourse.modules.map((m: any) => 
+        m.id === moduleId ? { ...m, title } : m
+      )
+    });
+  };
+
+  const updateLesson = (moduleId: string, lessonId: string, field: string, value: string) => {
+    setEditingCourse({
+      ...editingCourse,
+      modules: editingCourse.modules.map((m: any) => 
+        m.id === moduleId ? {
+          ...m,
+          lessons: m.lessons.map((l: any) => l.id === lessonId ? { ...l, [field]: value } : l)
+        } : m
+      )
+    });
   };
 
   if (loading) return <div className="h-screen flex items-center justify-center bg-slate-50"><Loader2 className="animate-spin text-indigo-600" size={40} /></div>;
@@ -284,6 +363,158 @@ export default function InstructorDashboard() {
                 ))}
               </div>
            </div>
+        )}
+
+        {activeTab === 'edit-course' && editingCourse && (
+          <div className="animate-fade-in space-y-12 pb-20">
+             <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div className="flex items-center gap-4">
+                  <button onClick={() => setActiveTab('courses')} className="w-12 h-12 bg-white border border-slate-200 rounded-2xl flex items-center justify-center hover:bg-slate-50 transition-all">
+                    <ArrowLeft size={20} />
+                  </button>
+                  <div>
+                    <h1 className="text-3xl font-black text-slate-900 italic uppercase tracking-tighter">Editando: {editingCourse.title}</h1>
+                    <p className="text-slate-500 font-bold text-[10px] uppercase tracking-widest">Ajuste o conteúdo e a precificação do seu treinamento.</p>
+                  </div>
+                </div>
+                <button onClick={handleSaveCourseContent} disabled={isSaving} className="bg-emerald-600 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-xl shadow-emerald-100 active:scale-95 disabled:opacity-50">
+                  {isSaving ? <Loader2 size={18} className="animate-spin" /> : <><Save size={18} /> Salvar Alterações</>}
+                </button>
+             </header>
+
+             <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+                <div className="lg:col-span-2 space-y-8">
+                   <section className="bg-white p-10 rounded-[40px] border border-slate-200 shadow-sm space-y-8">
+                      <div className="flex items-center gap-3 border-b border-slate-100 pb-6">
+                         <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center"><BookOpen size={20} /></div>
+                         <h3 className="text-lg font-black uppercase italic tracking-tight">Estrutura Curricular</h3>
+                      </div>
+
+                      <div className="space-y-6">
+                         {editingCourse.modules.map((module: any, mIdx: number) => (
+                           <div key={module.id} className="border border-slate-100 rounded-3xl overflow-hidden bg-slate-50/50">
+                              <div className="p-6 bg-slate-100 flex items-center justify-between gap-4">
+                                 <div className="flex-grow flex items-center gap-4">
+                                    <span className="text-[10px] font-black bg-slate-900 text-white w-6 h-6 flex items-center justify-center rounded-lg">{mIdx + 1}</span>
+                                    <input 
+                                      type="text" 
+                                      value={module.title} 
+                                      onChange={(e) => updateModuleTitle(module.id, e.target.value)}
+                                      className="bg-transparent border-none font-black uppercase text-xs outline-none focus:text-indigo-600 flex-grow"
+                                      placeholder="Título do Módulo"
+                                    />
+                                 </div>
+                                 <button onClick={() => removeModule(module.id)} className="text-slate-400 hover:text-rose-600 transition-colors"><Trash2 size={16} /></button>
+                              </div>
+                              <div className="p-6 space-y-4">
+                                 {module.lessons.map((lesson: any, lIdx: number) => (
+                                   <div key={lesson.id} className="bg-white p-6 rounded-2xl border border-slate-100 space-y-4 group">
+                                      <div className="flex justify-between items-center">
+                                         <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Aula {lIdx + 1}</span>
+                                         <button onClick={() => removeLesson(module.id, lesson.id)} className="opacity-0 group-hover:opacity-100 text-rose-500 hover:text-rose-700 transition-all"><X size={14} /></button>
+                                      </div>
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                         <div className="space-y-1">
+                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Título da Aula</label>
+                                            <input 
+                                              type="text" 
+                                              value={lesson.title} 
+                                              onChange={(e) => updateLesson(module.id, lesson.id, 'title', e.target.value)}
+                                              className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 text-xs font-bold outline-none"
+                                            />
+                                         </div>
+                                         <div className="space-y-1">
+                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Link do Vídeo (Embed)</label>
+                                            <input 
+                                              type="text" 
+                                              value={lesson.videoUrl} 
+                                              onChange={(e) => updateLesson(module.id, lesson.id, 'videoUrl', e.target.value)}
+                                              className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 text-xs font-bold outline-none"
+                                              placeholder="https://youtube.com/embed/..."
+                                            />
+                                         </div>
+                                      </div>
+                                      <div className="flex gap-4">
+                                        <div className="w-32 space-y-1">
+                                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Duração</label>
+                                          <input 
+                                              type="text" 
+                                              value={lesson.duration} 
+                                              onChange={(e) => updateLesson(module.id, lesson.id, 'duration', e.target.value)}
+                                              className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 text-xs font-bold outline-none"
+                                              placeholder="10:00"
+                                            />
+                                        </div>
+                                        <div className="flex-grow space-y-1">
+                                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Descrição curta</label>
+                                          <input 
+                                              type="text" 
+                                              value={lesson.description} 
+                                              onChange={(e) => updateLesson(module.id, lesson.id, 'description', e.target.value)}
+                                              className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 text-xs font-bold outline-none"
+                                            />
+                                        </div>
+                                      </div>
+                                   </div>
+                                 ))}
+                                 <button onClick={() => addLesson(module.id)} className="w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black uppercase text-slate-400 hover:bg-white hover:text-indigo-600 hover:border-indigo-200 transition-all flex items-center justify-center gap-2">
+                                    <Plus size={14} /> Adicionar Aula ao Módulo
+                                 </button>
+                              </div>
+                           </div>
+                         ))}
+                         <button onClick={addModule} className="w-full py-6 bg-slate-900 text-white rounded-3xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-indigo-600 transition-all shadow-xl">
+                            <Plus size={18} /> Novo Módulo Estrutural
+                         </button>
+                      </div>
+                   </section>
+                </div>
+
+                <aside className="space-y-8">
+                   <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-6">
+                      <h4 className="text-sm font-black uppercase italic tracking-widest border-b border-slate-50 pb-4">Informações de Venda</h4>
+                      <div className="space-y-4">
+                         <div>
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Preço do Treinamento (R$)</label>
+                            <div className="relative">
+                               <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500" size={18} />
+                               <input 
+                                 type="number" 
+                                 value={editingCourse.price} 
+                                 onChange={(e) => setEditingCourse({...editingCourse, price: e.target.value})}
+                                 className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 pl-12 pr-4 font-black text-xl text-slate-900 outline-none focus:ring-4 focus:ring-emerald-50" 
+                               />
+                            </div>
+                         </div>
+                         <div>
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Título Público</label>
+                            <input 
+                               type="text" 
+                               value={editingCourse.title} 
+                               onChange={(e) => setEditingCourse({...editingCourse, title: e.target.value})}
+                               className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 font-bold text-sm outline-none" 
+                            />
+                         </div>
+                         <div>
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Descrição Breve</label>
+                            <textarea 
+                               rows={4}
+                               value={editingCourse.description} 
+                               onChange={(e) => setEditingCourse({...editingCourse, description: e.target.value})}
+                               className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 font-medium text-sm outline-none resize-none" 
+                            />
+                         </div>
+                      </div>
+                   </div>
+
+                   <div className="bg-indigo-600 p-8 rounded-[40px] text-white space-y-4 shadow-xl shadow-indigo-100">
+                      <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><Zap size={20} /></div>
+                      <h4 className="font-black italic uppercase tracking-tighter">Dica do Professor</h4>
+                      <p className="text-xs font-medium opacity-80 leading-relaxed">Módulos bem estruturados aumentam a taxa de conclusão dos alunos em até 40%. Use títulos claros e diretos.</p>
+                   </div>
+                </aside>
+             </div>
+          </div>
         )}
 
         {showCreateModal && (
