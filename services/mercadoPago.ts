@@ -2,7 +2,7 @@
 import { supabase } from './supabase';
 
 /**
- * Busca o Access Token do Admin Master (para coletar a comissão)
+ * Busca o Access Token do Admin Master (Fallback ou para configurações globais)
  */
 const getAdminConfig = async () => {
   const { data } = await supabase
@@ -14,7 +14,7 @@ const getAdminConfig = async () => {
 };
 
 /**
- * Busca o Access Token do Professor
+ * Busca o Access Token do Professor dono do curso
  */
 const getInstructorAccessToken = async (instructorId?: string) => {
   if (!instructorId) return null;
@@ -30,21 +30,25 @@ const getInstructorAccessToken = async (instructorId?: string) => {
 
 /**
  * Cria a preferência de pagamento com Split de 1% (Marketplace Fee)
+ * Se o curso tem um instructor_id, usa o token dele.
  */
 export const createPreference = async (course: any, user: any, finalPrice?: number) => {
   try {
     const adminConfig = await getAdminConfig();
-    // Ajuste para instructor_id vindo do banco ou instructorId vindo de constantes legadas
-    const instructorToken = await getInstructorAccessToken(course.instructor_id || course.instructorId);
+    const instructorId = course.instructor_id || course.instructorId;
+    const instructorToken = await getInstructorAccessToken(instructorId);
     
+    // Prioriza o token do professor, senão usa o do admin
     const accessToken = instructorToken || adminConfig.accessToken;
     
     if (!accessToken) {
-      throw new Error("Sistema de pagamento indisponível para este instrutor.");
+      throw new Error("O professor deste curso ainda não configurou o Mercado Pago.");
     }
 
     const rawPrice = finalPrice !== undefined ? finalPrice : course.price;
     const price = Number(Number(rawPrice).toFixed(2));
+    
+    // Cálculo da comissão de 1% para o Admin Master
     const platformCommission = Number((price * 0.01).toFixed(2));
 
     const baseUrl = window.location.origin + window.location.pathname + (window.location.pathname.endsWith('/') ? '' : '/') + '#/my-courses';
@@ -71,8 +75,9 @@ export const createPreference = async (course: any, user: any, finalPrice?: numb
       },
       auto_return: 'approved',
       external_reference: externalReference,
+      // Esta taxa é enviada para a conta da aplicação vinculada ao token (Marketplace)
       marketplace_fee: platformCommission, 
-      statement_descriptor: "EDUVANTAGE CURSOS"
+      statement_descriptor: "EDUVANTAGE"
     };
 
     const response = await fetch('https://api.mercadopago.com/checkout/preferences', {

@@ -153,7 +153,7 @@ export default function InstructorDashboard() {
       setEditingCourse(data);
       setActiveTab('edit-course');
     } catch (err: any) {
-      alert("Erro ao criar curso. Verifique se as tabelas do banco foram criadas corretamente.");
+      alert("Erro ao criar curso. Verifique se as tabelas do banco foram criadas.");
     } finally {
       setIsSaving(false);
     }
@@ -169,7 +169,7 @@ export default function InstructorDashboard() {
         .eq('id', user.id);
       
       if (error) throw error;
-      alert("Configurações do Mercado Pago salvas!");
+      alert("Configurações salvas!");
     } catch (err: any) {
       alert("Erro ao salvar: " + err.message);
     } finally {
@@ -219,7 +219,7 @@ export default function InstructorDashboard() {
         .eq('id', editingCourse.id);
       
       if (error) throw error;
-      alert("Curso atualizado com sucesso!");
+      alert("Curso atualizado!");
       loadInstructorData();
       setActiveTab('courses');
     } catch (err: any) {
@@ -240,7 +240,7 @@ export default function InstructorDashboard() {
           </div>
           <div>
             <h2 className="text-xl font-black italic tracking-tighter text-white uppercase">Prof. Hub</h2>
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-[0.2em]">Mercado Pago LMS</p>
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-[0.2em]">LMS Console</p>
           </div>
         </div>
 
@@ -256,7 +256,7 @@ export default function InstructorDashboard() {
           <div className="space-y-12 animate-fade-in">
             <header>
               <h1 className="text-4xl font-black text-slate-900 tracking-tight italic uppercase">Minha Performance</h1>
-              <p className="text-slate-500 font-medium text-sm">Vendas processadas via Mercado Pago.</p>
+              <p className="text-slate-500 font-medium text-sm">Acompanhe seu crescimento.</p>
             </header>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <StatCard label="Receita Bruta" value={`R$ ${stats.totalRevenue.toLocaleString()}`} icon={<DollarSign className="text-indigo-500" />} trend="Total vendido" />
@@ -272,7 +272,7 @@ export default function InstructorDashboard() {
                  <img src="https://logodownload.org/wp-content/uploads/2017/06/mercado-pago-logo-1.png" className="h-8" alt="Mercado Pago" />
               </div>
               <h1 className="text-3xl font-black text-slate-900 italic uppercase">Configurar Mercado Pago</h1>
-              <p className="text-slate-500 font-medium">Insira suas credenciais para receber os pagamentos diretamente.</p>
+              <p className="text-slate-500 font-medium">Insira suas credenciais de produção para receber.</p>
             </header>
             <div className="bg-white p-10 rounded-[40px] border border-slate-200 shadow-sm space-y-8">
                <div className="space-y-6">
@@ -304,9 +304,9 @@ export default function InstructorDashboard() {
         {activeTab === 'courses' && (
            <div className="space-y-8 animate-fade-in">
               <div className="flex justify-between items-center">
-                 <h1 className="text-3xl font-black text-slate-900 italic uppercase">Cursos Criados</h1>
+                 <h1 className="text-3xl font-black text-slate-900 italic uppercase">Meus Cursos</h1>
                  <button onClick={() => setShowCreateModal(true)} className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-indigo-200">
-                   <Plus size={18} /> Novo Curso
+                   <Plus size={18} /> Novo Treinamento
                  </button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
