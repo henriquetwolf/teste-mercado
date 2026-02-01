@@ -29,7 +29,7 @@ const getInstructorAccessToken = async (instructorId?: string) => {
 };
 
 /**
- * Cria a preferência de pagamento com Split de 1% (Marketplace Fee)
+ * Cria a preferência de pagamento com Split dinâmico (Marketplace Fee)
  */
 export const createPreference = async (course: any, user: any, finalPrice?: number) => {
   try {
@@ -40,6 +40,9 @@ export const createPreference = async (course: any, user: any, finalPrice?: numb
     // O Access Token deve ser o do PROFESSOR para que ele receba
     const accessToken = instructorToken || adminConfig.accessToken;
     
+    // Taxa dinâmica definida pelo admin (default 1%)
+    const commissionRate = adminConfig.commissionRate ?? 1;
+    
     if (!accessToken) {
       throw new Error("O professor deste curso ainda não configurou o Mercado Pago.");
     }
@@ -47,9 +50,8 @@ export const createPreference = async (course: any, user: any, finalPrice?: numb
     const rawPrice = finalPrice !== undefined ? finalPrice : course.price;
     const price = Number(Number(rawPrice).toFixed(2));
     
-    // Taxa de 1% que vai para o dono da aplicação (Admin Master)
-    // Nota: O Mercado Pago exige que o token seja de uma aplicação Marketplace para o fee funcionar.
-    const platformFee = Number((price * 0.01).toFixed(2));
+    // Taxa dinâmica que vai para o dono da aplicação (Admin Master)
+    const platformFee = Number((price * (commissionRate / 100)).toFixed(2));
 
     const baseUrl = window.location.origin + window.location.pathname + (window.location.pathname.endsWith('/') ? '' : '/') + '#/my-courses';
     const attemptId = Date.now().toString().slice(-6);
@@ -75,7 +77,7 @@ export const createPreference = async (course: any, user: any, finalPrice?: numb
       },
       auto_return: 'approved',
       external_reference: externalReference,
-      // marketplace_fee envia 1% para a conta master associada ao token da aplicação
+      // marketplace_fee envia a taxa dinâmica para a conta master associada ao token da aplicação
       marketplace_fee: platformFee, 
       statement_descriptor: "EDUVANTAGE"
     };

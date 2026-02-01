@@ -23,7 +23,8 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Percent
 } from 'lucide-react';
 
 const GlobalStat = ({ label, value, icon }: any) => (
@@ -55,7 +56,7 @@ const StatusLine = ({ label, status }: any) => (
 
 export default function Admin() {
   const [activeTab, setActiveTab] = useState<'stats' | 'users' | 'sales' | 'settings'>('stats');
-  const [stats, setStats] = useState({ revenue: 0, users: 0, courses: 0, sales: 0, platformFee: 0 });
+  const [stats, setStats] = useState({ revenue: 0, users: 0, courses: 0, sales: 0, platformFee: 0, commissionRate: 1 });
   const [usersList, setUsersList] = useState<any[]>([]);
   const [salesList, setSalesList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,7 +66,8 @@ export default function Admin() {
 
   const [mpConfig, setMpConfig] = useState({
     publicKey: '',
-    accessToken: ''
+    accessToken: '',
+    commissionRate: 1
   });
 
   useEffect(() => {
@@ -79,16 +81,28 @@ export default function Admin() {
       const { count: coursesCount } = await supabase.from('courses').select('*', { count: 'exact', head: true });
       const { data: salesData } = await supabase.from('sales').select('amount, status').eq('status', 'Pago');
       
+      const { data: config } = await supabase.from('platform_settings').select('value').eq('key', 'mercadopago_config').maybeSingle();
+      const currentRate = config?.value?.commissionRate ?? 1;
+
       const totalRevenue = salesData?.reduce((acc, s) => acc + s.amount, 0) || 0;
-      const totalPlatformFee = totalRevenue * 0.01;
+      const totalPlatformFee = totalRevenue * (currentRate / 100);
 
       setStats({
         revenue: totalRevenue,
         users: usersCount || 0,
         courses: coursesCount || 0,
         sales: salesData?.length || 0,
-        platformFee: totalPlatformFee
+        platformFee: totalPlatformFee,
+        commissionRate: currentRate
       });
+
+      if (config?.value) {
+        setMpConfig({
+          publicKey: config.value.publicKey || '',
+          accessToken: config.value.accessToken || '',
+          commissionRate: currentRate
+        });
+      }
 
       const { data: users } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
       if (users) setUsersList(users);
@@ -103,19 +117,10 @@ export default function Admin() {
         .order('created_at', { ascending: false });
       
       if (salesError) {
-        console.error("Erro na query de vendas complexa, tentando simples:", salesError);
         const { data: simpleSales } = await supabase.from('sales').select('*').order('created_at', { ascending: false });
         if (simpleSales) setSalesList(simpleSales);
       } else if (salesHistory) {
         setSalesList(salesHistory);
-      }
-
-      const { data: config } = await supabase.from('platform_settings').select('value').eq('key', 'mercadopago_config').maybeSingle();
-      if (config?.value) {
-        setMpConfig({
-          publicKey: config.value.publicKey || '',
-          accessToken: config.value.accessToken || ''
-        });
       }
 
     } catch (err) {
@@ -139,6 +144,7 @@ export default function Admin() {
       
       if (error) throw error;
       alert("Configuração Master salva!");
+      loadAllData();
     } catch (err: any) {
       alert("Erro ao salvar: " + err.message);
     } finally {
@@ -186,8 +192,8 @@ export default function Admin() {
               </div>
            </div>
            <div className="flex gap-6">
-              <div className="bg-white/5 border border-white/10 p-10 rounded-[48px] backdrop-blur-xl group hover:bg-white/10 transition-all">
-                 <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2">Comissões Coletadas (1%)</p>
+              <div className="bg-white/5 border border-white/10 p-10 rounded-[48px] backdrop-blur-xl group hover:bg-white/10 transition-all text-center">
+                 <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2">Comissões Coletadas ({stats.commissionRate}%)</p>
                  <div className="flex items-center gap-4">
                     <h2 className="text-5xl font-black tracking-tighter italic">R$ {stats.platformFee.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h2>
                     <div className="bg-emerald-500/20 text-emerald-500 p-2 rounded-full"><ArrowUpRight size={24} /></div>
@@ -205,8 +211,9 @@ export default function Admin() {
                 <MiniStat label="Transacionado" value={`R$ ${stats.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon={<DollarSign size={18} />} />
                 <GlobalStat label="Alunos" value={stats.users.toString()} icon={<Users size={20} />} />
                 <GlobalStat label="Cursos" value={stats.courses.toString()} icon={<BookOpen size={20} />} />
-                <GlobalStat label="Uptime" value="99.9%" icon={<Globe size={20} />} />
+                <GlobalStat label="Taxa Atual" value={`${stats.commissionRate}%`} icon={<Percent size={20} />} />
             </div>
+            {/* Rest of Stats UI */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 mt-16">
                 <div className="lg:col-span-2 space-y-12">
                    <section className="bg-white p-12 rounded-[48px] border border-slate-200 shadow-sm">
@@ -235,7 +242,7 @@ export default function Admin() {
                          </div>
                          <div className="space-y-6">
                             <StatusLine label="Split Engine" status="ACTIVE" />
-                            <StatusLine label="Platform Fee" status="1.0% FIXED" />
+                            <StatusLine label="Platform Fee" status={`${stats.commissionRate}% DYNAMIC`} />
                          </div>
                       </div>
                    </div>
@@ -244,6 +251,7 @@ export default function Admin() {
            </div>
          )}
 
+         {/* Rest of Admin Tabs */}
          {activeTab === 'users' && (
            <div className="bg-white rounded-[40px] border border-slate-200 shadow-xl overflow-hidden animate-fade-in">
               <div className="p-8 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
@@ -309,7 +317,7 @@ export default function Admin() {
                         </td>
                         <td className="px-8 py-6">
                            <p className="text-sm font-black text-slate-900">R$ {Number(sale.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                           <p className="text-[9px] font-bold text-slate-400 uppercase">Fee: R$ {(Number(sale.amount) * 0.01).toFixed(2)}</p>
+                           <p className="text-[9px] font-bold text-slate-400 uppercase">Fee: R$ {(Number(sale.amount) * (stats.commissionRate / 100)).toFixed(2)}</p>
                         </td>
                         <td className="px-8 py-6">
                            <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase border ${sale.status === 'Pago' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-amber-50 border-amber-100 text-amber-600'}`}>{sale.status || 'Pendente'}</span>
@@ -334,6 +342,21 @@ export default function Admin() {
                     </div>
                  </div>
                  <div className="grid grid-cols-1 gap-8">
+                    <div className="bg-indigo-50 p-6 rounded-3xl border border-indigo-100">
+                        <label className="text-[10px] font-black uppercase text-indigo-600 mb-2 block tracking-widest">Participação da Plataforma (%)</label>
+                        <div className="flex items-center gap-4">
+                          <input 
+                            type="number" 
+                            step="0.1"
+                            value={mpConfig.commissionRate} 
+                            onChange={(e) => setMpConfig({ ...mpConfig, commissionRate: parseFloat(e.target.value) || 0 })} 
+                            className="w-32 bg-white border border-indigo-200 rounded-2xl py-4 px-4 font-black text-xl text-indigo-600 outline-none" 
+                          />
+                          <div className="text-slate-400 font-bold text-xs">
+                             Esta porcentagem será descontada automaticamente em cada venda realizada na plataforma.
+                          </div>
+                        </div>
+                    </div>
                     <div>
                         <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">Public Key Master (MP)</label>
                         <input type="text" value={mpConfig.publicKey} onChange={(e) => setMpConfig({ ...mpConfig, publicKey: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 px-4 font-mono text-xs outline-none" />
