@@ -5,12 +5,7 @@ import { searchPayments } from '../services/mercadoPago';
 import { 
   Settings, 
   BarChart3, 
-  Users, 
   CreditCard, 
-  Save, 
-  ShieldCheck, 
-  Plus, 
-  Trash2, 
   BookOpen, 
   DollarSign, 
   Loader2, 
@@ -18,25 +13,26 @@ import {
   Key,
   Wallet,
   ExternalLink,
-  CheckCircle2,
-  Info,
   RefreshCcw,
   ArrowUpRight,
-  Clock,
-  User as UserIcon,
-  Search,
   ShoppingCart,
   AlertCircle,
-  GraduationCap
+  GraduationCap,
+  Tag,
+  Plus,
+  Trash2,
+  X,
+  Check
 } from 'lucide-react';
 
 export default function Admin() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'settings' | 'sales' | 'courses'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'settings' | 'sales' | 'courses' | 'coupons'>('dashboard');
   const [activeSalesSubTab, setActiveSalesSubTab] = useState<'api' | 'local'>('local');
   const [mpConfig, setMpConfig] = useState({ publicKey: '', accessToken: '', mode: 'production' });
   const [mpSales, setMpSales] = useState<any[]>([]);
   const [localSales, setLocalSales] = useState<any[]>([]);
   const [courses, setCourses] = useState<any[]>([]);
+  const [coupons, setCoupons] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -51,6 +47,13 @@ export default function Admin() {
     modules: [] as any[]
   });
 
+  const [couponForm, setCouponForm] = useState({
+    code: '',
+    discount_percent: 10,
+    active: true
+  });
+  const [showCouponModal, setShowCouponModal] = useState(false);
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -63,6 +66,9 @@ export default function Admin() {
 
       const { data: coursesData } = await supabase.from('courses').select('*').order('created_at', { ascending: false });
       if (coursesData) setCourses(coursesData);
+
+      const { data: couponsData } = await supabase.from('coupons').select('*').order('created_at', { ascending: false });
+      if (couponsData) setCoupons(couponsData);
 
       const { data: localSalesData } = await supabase
         .from('sales')
@@ -87,6 +93,9 @@ export default function Admin() {
       setMpSales(sales);
       const { data: localSalesData } = await supabase.from('sales').select('*, courses(title)').order('created_at', { ascending: false });
       if (localSalesData) setLocalSales(localSalesData);
+      
+      const { data: couponsData } = await supabase.from('coupons').select('*').order('created_at', { ascending: false });
+      if (couponsData) setCoupons(couponsData);
     } catch (err) {
       console.error(err);
     } finally {
@@ -119,6 +128,38 @@ export default function Admin() {
       alert(`Erro: ${err.message}`);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const saveCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    try {
+      const { error } = await supabase.from('coupons').upsert({
+        code: couponForm.code.toUpperCase().trim(),
+        discount_percent: couponForm.discount_percent,
+        active: couponForm.active
+      });
+      if (error) throw error;
+      alert("Cupom salvo!");
+      setShowCouponModal(false);
+      setCouponForm({ code: '', discount_percent: 10, active: true });
+      await fetchData();
+    } catch (err: any) {
+      alert(`Erro: ${err.message}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const deleteCoupon = async (id: string) => {
+    if (!confirm("Excluir este cupom?")) return;
+    try {
+      const { error } = await supabase.from('coupons').delete().eq('id', id);
+      if (error) throw error;
+      await fetchData();
+    } catch (err: any) {
+      alert(err.message);
     }
   };
 
@@ -156,6 +197,7 @@ export default function Admin() {
         <nav className="p-6 space-y-2 flex-grow">
           <NavItem active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<BarChart3 size={20}/>} label="Dashboard" />
           <NavItem active={activeTab === 'courses'} onClick={() => { setActiveTab('courses'); setEditingCourse(null); }} icon={<BookOpen size={20}/>} label="Gerenciar Cursos" />
+          <NavItem active={activeTab === 'coupons'} onClick={() => setActiveTab('coupons')} icon={<Tag size={20}/>} label="Cupons" />
           <NavItem active={activeTab === 'sales'} onClick={() => setActiveTab('sales')} icon={<CreditCard size={20}/>} label="Vendas & Leads" />
           <NavItem active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<Wallet size={20}/>} label="Configurar API" />
         </nav>
@@ -173,6 +215,7 @@ export default function Admin() {
                 <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-2 uppercase italic">
                   {activeTab === 'dashboard' ? 'Performance' : 
                    activeTab === 'courses' ? 'Treinamentos' :
+                   activeTab === 'coupons' ? 'Promoções' :
                    activeTab === 'sales' ? 'Gestão de Vendas' : 'Conexão MP'}
                 </h1>
                 <p className="text-slate-500 font-medium">Controle total da sua operação digital.</p>
@@ -185,6 +228,12 @@ export default function Admin() {
                      setCourseForm({ title: '', instructor: '', price: 0, thumbnail: '', description: '', modules: [] });
                   }} className="bg-sky-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:bg-sky-700 shadow-xl shadow-sky-200 transition-all active:scale-95">
                     <Plus size={20} /> Novo Curso
+                  </button>
+                )}
+
+                {activeTab === 'coupons' && (
+                  <button onClick={() => setShowCouponModal(true)} className="bg-sky-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:bg-sky-700 shadow-xl shadow-sky-200 transition-all active:scale-95">
+                    <Plus size={20} /> Novo Cupom
                   </button>
                 )}
                 
@@ -238,7 +287,10 @@ export default function Admin() {
                              </div>
                              <div>
                                <p className="text-sm font-black text-slate-900">ID: {sale.user_id.slice(0,8)}... no curso {sale.courses?.title}</p>
-                               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{new Date(sale.created_at).toLocaleString()}</p>
+                               <div className="flex items-center gap-2">
+                                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{new Date(sale.created_at).toLocaleString()}</p>
+                                 {sale.coupon_code && <span className="text-[9px] font-black text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 uppercase">Cupom: {sale.coupon_code}</span>}
+                               </div>
                              </div>
                           </div>
                           <div className="text-right">
@@ -250,6 +302,73 @@ export default function Admin() {
                        </div>
                      ))}
                    </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'coupons' && (
+              <div className="animate-fade-in">
+                {showCouponModal && (
+                  <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                    <form onSubmit={saveCoupon} className="bg-white rounded-[40px] p-10 w-full max-w-md shadow-2xl relative">
+                      <button type="button" onClick={() => setShowCouponModal(false)} className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 transition-colors">
+                        <X size={24} />
+                      </button>
+                      <h2 className="text-2xl font-black text-slate-900 mb-8 flex items-center gap-2">
+                        <Tag className="text-sky-500" /> Criar Cupom
+                      </h2>
+                      
+                      <div className="space-y-6">
+                        <div>
+                          <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">Código do Cupom</label>
+                          <input required value={couponForm.code} onChange={e => setCouponForm({...couponForm, code: e.target.value.toUpperCase()})} placeholder="EX: BLACKFRIDAY50" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-black text-slate-900 placeholder:text-slate-300" />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">Porcentagem de Desconto (%)</label>
+                          <input type="number" min="1" max="100" required value={couponForm.discount_percent} onChange={e => setCouponForm({...couponForm, discount_percent: parseInt(e.target.value)})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-black text-sky-600 text-xl" />
+                        </div>
+                        <div className="flex items-center gap-3 bg-slate-50 p-4 rounded-2xl">
+                          <input type="checkbox" id="coupon_active" checked={couponForm.active} onChange={e => setCouponForm({...couponForm, active: e.target.checked})} className="w-5 h-5 accent-sky-600" />
+                          <label htmlFor="coupon_active" className="text-xs font-black text-slate-600 uppercase">Cupom Ativo</label>
+                        </div>
+                      </div>
+
+                      <button type="submit" disabled={isSaving} className="w-full mt-8 bg-sky-600 text-white py-5 rounded-2xl font-black hover:bg-sky-700 shadow-xl shadow-sky-100 transition-all flex items-center justify-center">
+                        {isSaving ? <Loader2 className="animate-spin" /> : 'CRIAR CUPOM'}
+                      </button>
+                    </form>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {coupons.map(coupon => (
+                    <div key={coupon.id} className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm group hover:shadow-xl transition-all duration-500">
+                      <div className="flex justify-between items-start mb-6">
+                        <div className="w-12 h-12 bg-sky-50 rounded-2xl flex items-center justify-center text-sky-600">
+                          <Tag size={24} />
+                        </div>
+                        <button onClick={() => deleteCoupon(coupon.id)} className="text-slate-300 hover:text-rose-500 transition-colors">
+                          <Trash2 size={20} />
+                        </button>
+                      </div>
+                      <h3 className="text-xl font-black text-slate-900 mb-1">{coupon.code}</h3>
+                      <p className="text-3xl font-black text-emerald-500 mb-6">{coupon.discount_percent}% OFF</p>
+                      
+                      <div className="flex items-center justify-between pt-6 border-t border-slate-50">
+                        <div className={`flex items-center gap-1 text-[10px] font-black uppercase ${coupon.active ? 'text-emerald-500' : 'text-slate-400'}`}>
+                          {coupon.active ? <Check size={14} /> : <X size={14} />}
+                          {coupon.active ? 'Ativo' : 'Inativo'}
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-300">Criado em {new Date(coupon.created_at).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {coupons.length === 0 && (
+                    <div className="col-span-full py-20 text-center border-2 border-dashed border-slate-200 rounded-[40px]">
+                       <Tag className="mx-auto text-slate-200 mb-4" size={48} />
+                       <p className="text-slate-400 font-bold uppercase tracking-widest text-sm">Nenhum cupom cadastrado</p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -268,9 +387,9 @@ export default function Admin() {
                          <tr>
                             <th className="px-8 py-6">Data / Lead</th>
                             <th className="px-8 py-6">Curso Pretendido</th>
-                            <th className="px-8 py-6">Valor</th>
+                            <th className="px-8 py-6">Cupom</th>
+                            <th className="px-8 py-6">Valor Final</th>
                             <th className="px-8 py-6">Situação</th>
-                            <th className="px-8 py-6">Ref. MP</th>
                          </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -284,6 +403,13 @@ export default function Admin() {
                                   <div className="text-xs font-bold text-slate-600">{sale.courses?.title || 'Curso não identificado'}</div>
                                </td>
                                <td className="px-8 py-6">
+                                  {sale.coupon_code ? (
+                                    <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded border border-emerald-100 uppercase">{sale.coupon_code}</span>
+                                  ) : (
+                                    <span className="text-[10px] font-bold text-slate-300">-</span>
+                                  )}
+                               </td>
+                               <td className="px-8 py-6">
                                   <span className="text-sm font-black text-slate-900">R$ {sale.amount?.toFixed(2)}</span>
                                </td>
                                <td className="px-8 py-6">
@@ -291,7 +417,6 @@ export default function Admin() {
                                      {sale.status === 'Iniciado' ? 'CHECKOUT ABANDONADO' : sale.status}
                                   </span>
                                </td>
-                               <td className="px-8 py-6 text-[10px] font-mono text-slate-400">{sale.mp_preference_id || '-'}</td>
                             </tr>
                          ))}
                       </tbody>

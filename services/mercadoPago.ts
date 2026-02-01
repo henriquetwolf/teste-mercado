@@ -20,9 +20,10 @@ const getAccessToken = async () => {
 /**
  * Cria a preferência de pagamento (Checkout Pro)
  */
-export const createPreference = async (course: any, user: any) => {
+export const createPreference = async (course: any, user: any, finalPrice?: number) => {
   try {
     const accessToken = await getAccessToken();
+    const price = finalPrice !== undefined ? finalPrice : course.price;
 
     // Nota: Usamos query params simplificados para o back_url
     const baseUrl = window.location.origin + window.location.pathname + (window.location.pathname.endsWith('/') ? '' : '/') + '#/my-courses';
@@ -38,7 +39,7 @@ export const createPreference = async (course: any, user: any) => {
           {
             id: course.id,
             title: course.title,
-            unit_price: course.price,
+            unit_price: price,
             quantity: 1,
             currency_id: 'BRL'
           }

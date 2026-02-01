@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ShieldCheck, Lock, CreditCard, ChevronLeft, Loader2, Wallet, CheckCircle2, ArrowRight } from 'lucide-react';
+import { ShieldCheck, Lock, ChevronLeft, Loader2, Wallet, CheckCircle2, ArrowRight, Tag, X } from 'lucide-react';
 import { COURSES } from '../constants';
 import { supabase } from '../services/supabase';
 import { createPreference } from '../services/mercadoPago';
@@ -14,6 +14,12 @@ export default function Checkout({ onComplete }: { onComplete: (id: string) => v
   const [preferenceId, setPreferenceId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [user, setUser] = useState<any>(null);
+
+  // Coupon state
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<{code: string, discount: number} | null>(null);
+  const [couponError, setCouponError] = useState('');
+  const [isApplying, setIsApplying] = useState(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -36,20 +42,64 @@ export default function Checkout({ onComplete }: { onComplete: (id: string) => v
     }
   }
 
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setIsApplying(true);
+    setCouponError('');
+    
+    try {
+      const { data, error } = await supabase
+        .from('coupons')
+        .select('*')
+        .eq('code', couponCode.toUpperCase().trim())
+        .eq('active', true)
+        .maybeSingle();
+
+      if (error) throw error;
+      
+      if (!data) {
+        setCouponError('Cupom inválido ou expirado.');
+        return;
+      }
+
+      setAppliedCoupon({ code: data.code, discount: data.discount_percent });
+    } catch (err) {
+      setCouponError('Erro ao validar cupom.');
+    } finally {
+      setIsApplying(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode('');
+    setCouponError('');
+  };
+
+  const calculateTotal = () => {
+    if (!course) return 0;
+    if (!appliedCoupon) return course.price;
+    const discountAmount = (course.price * appliedCoupon.discount) / 100;
+    return Math.max(0, course.price - discountAmount);
+  };
+
   const handleStartPayment = async () => {
     if (!course || !user) return;
     setIsGenerating(true);
+    const finalPrice = calculateTotal();
+    
     try {
-      const id = await createPreference(course, user);
+      const id = await createPreference(course, user, finalPrice);
       setPreferenceId(id);
       
       // Registrar intenção de compra
       await supabase.from('sales').insert({
         user_id: user.id,
         course_id: course.id,
-        amount: course.price,
+        amount: finalPrice,
         status: 'Iniciado',
-        mp_preference_id: id
+        mp_preference_id: id,
+        coupon_code: appliedCoupon?.code || null
       });
 
       // Redirecionar para o Checkout Pro do Mercado Pago
@@ -63,6 +113,8 @@ export default function Checkout({ onComplete }: { onComplete: (id: string) => v
 
   if (loading) return <div className="p-20 text-center"><Loader2 className="animate-spin mx-auto text-sky-600" /></div>;
   if (!course) return <div className="p-20 text-center">Curso não encontrado</div>;
+
+  const total = calculateTotal();
 
   return (
     <div className="bg-slate-50 min-h-screen py-12">
@@ -79,21 +131,41 @@ export default function Checkout({ onComplete }: { onComplete: (id: string) => v
             <h2 className="text-3xl font-black mb-2">Resumo do Pedido</h2>
             <p className="text-slate-400 mb-8 text-sm">Você está adquirindo acesso vitalício ao treinamento.</p>
             
-            <div className="space-y-6 mb-12">
+            <div className="space-y-6 mb-8">
               <div className="flex justify-between items-center p-4 bg-white/5 rounded-2xl border border-white/10">
                 <div>
                   <div className="text-xs font-bold text-sky-400 uppercase mb-1">Produto</div>
                   <div className="text-sm font-bold line-clamp-1">{course.title}</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-xs font-bold text-slate-500 uppercase mb-1">Preço</div>
+                  <div className="text-xs font-bold text-slate-500 uppercase mb-1">Preço Base</div>
                   <div className="text-sm font-bold">R$ {course.price.toFixed(2)}</div>
                 </div>
               </div>
 
+              {appliedCoupon && (
+                <div className="flex justify-between items-center p-4 bg-emerald-500/10 rounded-2xl border border-emerald-500/20">
+                  <div className="flex items-center gap-2">
+                    <Tag size={16} className="text-emerald-400" />
+                    <div>
+                      <div className="text-xs font-bold text-emerald-400 uppercase">Cupom Aplicado</div>
+                      <div className="text-sm font-bold">{appliedCoupon.code} ({appliedCoupon.discount}% OFF)</div>
+                    </div>
+                  </div>
+                  <button onClick={removeCoupon} className="text-emerald-400/50 hover:text-emerald-400 transition-colors">
+                    <X size={16} />
+                  </button>
+                </div>
+              )}
+
               <div className="flex justify-between items-end border-t border-white/10 pt-6">
                 <span className="text-sm font-bold text-slate-400">Total a pagar agora</span>
-                <span className="text-4xl font-black text-sky-400">R$ {course.price.toFixed(2)}</span>
+                <div className="text-right">
+                  {appliedCoupon && (
+                    <div className="text-xs text-slate-500 line-through mb-1">R$ {course.price.toFixed(2)}</div>
+                  )}
+                  <span className="text-4xl font-black text-sky-400">R$ {total.toFixed(2)}</span>
+                </div>
               </div>
             </div>
 
@@ -105,7 +177,7 @@ export default function Checkout({ onComplete }: { onComplete: (id: string) => v
           </div>
 
           <div className="flex-1 p-12 flex flex-col justify-center items-center text-center bg-white">
-            <div className="mb-10">
+            <div className="mb-10 w-full">
               <img 
                 src="https://imgmp.mlstatic.com/resources/frontend/statics/ml-uikit/resources/utils/checkouts/mercadopago-logo.png" 
                 alt="Mercado Pago" 
@@ -115,6 +187,31 @@ export default function Checkout({ onComplete }: { onComplete: (id: string) => v
             </div>
 
             <div className="w-full space-y-6">
+              {/* Coupon Section */}
+              <div className="w-full">
+                <div className="flex gap-2">
+                  <div className="relative flex-grow">
+                    <Tag className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                    <input 
+                      type="text" 
+                      placeholder="CUPOM DE DESCONTO"
+                      value={couponCode}
+                      onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                      disabled={!!appliedCoupon}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3 pl-10 pr-4 text-xs font-bold focus:ring-4 focus:ring-sky-50 focus:border-sky-500 outline-none transition-all placeholder:text-slate-300"
+                    />
+                  </div>
+                  <button 
+                    onClick={handleApplyCoupon}
+                    disabled={isApplying || !!appliedCoupon || !couponCode}
+                    className="bg-slate-900 text-white px-6 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-800 transition-all disabled:opacity-30"
+                  >
+                    {isApplying ? <Loader2 className="animate-spin" size={14} /> : 'Aplicar'}
+                  </button>
+                </div>
+                {couponError && <p className="text-[10px] text-rose-500 font-bold mt-2 text-left ml-2">{couponError}</p>}
+              </div>
+
               <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 text-left">
                 <h4 className="font-black text-slate-900 text-sm mb-4 flex items-center gap-2">
                   <CheckCircle2 size={18} className="text-emerald-500" /> 
@@ -155,7 +252,7 @@ export default function Checkout({ onComplete }: { onComplete: (id: string) => v
               </div>
             </div>
 
-            <div className="mt-12 flex items-center gap-2 text-slate-300">
+            <div className="mt-8 flex items-center gap-2 text-slate-300">
                <Lock size={12} />
                <span className="text-[9px] font-bold uppercase tracking-widest">SSL 256-bit Encrypted</span>
             </div>
