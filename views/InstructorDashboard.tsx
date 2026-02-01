@@ -12,7 +12,9 @@ import {
   CreditCard,
   TrendingUp,
   Zap,
-  Info
+  Info,
+  X,
+  Image as ImageIcon
 } from 'lucide-react';
 
 const SidebarBtn = ({ active, onClick, icon, label }: any) => (
@@ -45,15 +47,26 @@ export default function InstructorDashboard() {
   const [courses, setCourses] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
+  // Stats
   const [stats, setStats] = useState({ totalRevenue: 0, totalStudents: 0, activeCourses: 0 });
 
+  // Payment Config
   const [paymentConfig, setPaymentConfig] = useState({
     gateway: 'mercadopago',
     pagseguroEmail: '',
     pagseguroToken: '',
     mercadopagoPublicKey: '',
     mercadopagoAccessToken: ''
+  });
+
+  // Novo Curso State
+  const [newCourse, setNewCourse] = useState({
+    title: '',
+    description: '',
+    price: '',
+    thumbnail: 'https://picsum.photos/seed/course/800/450'
   });
 
   useEffect(() => {
@@ -104,6 +117,42 @@ export default function InstructorDashboard() {
       setLoading(false);
     }
   }
+
+  const handleCreateCourse = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    setIsSaving(true);
+
+    try {
+      const { data, error } = await supabase
+        .from('courses')
+        .insert({
+          title: newCourse.title,
+          description: newCourse.description,
+          price: parseFloat(newCourse.price),
+          thumbnail: newCourse.thumbnail,
+          instructor: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Professor',
+          instructorId: user.id,
+          modules: [],
+          rating: 5.0,
+          students: 0
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setCourses([data, ...courses]);
+      setStats(prev => ({ ...prev, activeCourses: prev.activeCourses + 1 }));
+      setShowCreateModal(false);
+      setNewCourse({ title: '', description: '', price: '', thumbnail: 'https://picsum.photos/seed/course/800/450' });
+      alert("Curso criado com sucesso! Agora você pode adicionar módulos e aulas.");
+    } catch (err: any) {
+      alert("Erro ao criar curso: " + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleSavePaymentConfig = async () => {
     if (!user) return;
@@ -157,7 +206,7 @@ export default function InstructorDashboard() {
       </div>
 
       {/* Main Area */}
-      <div className="flex-grow p-8 lg:p-12 overflow-y-auto">
+      <div className="flex-grow p-8 lg:p-12 overflow-y-auto relative">
         {activeTab === 'overview' && (
           <div className="space-y-12 animate-fade-in">
             <header className="flex justify-between items-center">
@@ -238,7 +287,10 @@ export default function InstructorDashboard() {
            <div className="space-y-8 animate-fade-in">
               <div className="flex justify-between items-center">
                  <h1 className="text-3xl font-black text-slate-900 italic uppercase">Meus Treinamentos</h1>
-                 <button className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-indigo-700 transition-all">
+                 <button 
+                  onClick={() => setShowCreateModal(true)}
+                  className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200"
+                 >
                    <Plus size={18} /> Novo Curso
                  </button>
               </div>
@@ -268,6 +320,88 @@ export default function InstructorDashboard() {
                 )}
               </div>
            </div>
+        )}
+
+        {/* Modal Novo Curso */}
+        {showCreateModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+             <div className="bg-white w-full max-w-2xl rounded-[48px] shadow-2xl overflow-hidden animate-zoom-in">
+                <div className="p-10 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                   <div>
+                      <h3 className="text-2xl font-black italic uppercase tracking-tighter">Criar Novo Treinamento</h3>
+                      <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">Defina os detalhes básicos do seu curso</p>
+                   </div>
+                   <button onClick={() => setShowCreateModal(false)} className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-slate-400 hover:text-rose-500 transition-all border border-slate-200"><X size={20} /></button>
+                </div>
+
+                <form onSubmit={handleCreateCourse} className="p-10 space-y-6">
+                   <div className="space-y-4">
+                      <div>
+                         <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">Título do Curso</label>
+                         <input 
+                           required
+                           type="text" 
+                           value={newCourse.title}
+                           onChange={e => setNewCourse({...newCourse, title: e.target.value})}
+                           placeholder="Ex: Domine o React 19" 
+                           className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 font-bold text-sm outline-none focus:ring-4 focus:ring-indigo-50" 
+                         />
+                      </div>
+                      
+                      <div>
+                         <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">Descrição Breve</label>
+                         <textarea 
+                           required
+                           rows={3}
+                           value={newCourse.description}
+                           onChange={e => setNewCourse({...newCourse, description: e.target.value})}
+                           placeholder="O que os alunos vão aprender?" 
+                           className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 font-bold text-sm outline-none focus:ring-4 focus:ring-indigo-50"
+                         />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-6">
+                         <div>
+                            <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">Preço (R$)</label>
+                            <div className="relative">
+                               <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                               <input 
+                                 required
+                                 type="number" 
+                                 step="0.01"
+                                 value={newCourse.price}
+                                 onChange={e => setNewCourse({...newCourse, price: e.target.value})}
+                                 placeholder="197.00" 
+                                 className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 pl-10 font-bold text-sm outline-none focus:ring-4 focus:ring-indigo-50" 
+                               />
+                            </div>
+                         </div>
+                         <div>
+                            <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">URL da Thumbnail</label>
+                            <div className="relative">
+                               <ImageIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                               <input 
+                                 type="text" 
+                                 value={newCourse.thumbnail}
+                                 onChange={e => setNewCourse({...newCourse, thumbnail: e.target.value})}
+                                 placeholder="https://..." 
+                                 className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 pl-10 font-bold text-sm outline-none focus:ring-4 focus:ring-indigo-50" 
+                               />
+                            </div>
+                         </div>
+                      </div>
+                   </div>
+
+                   <button 
+                     type="submit"
+                     disabled={isSaving}
+                     className="w-full bg-indigo-600 text-white py-6 rounded-3xl font-black text-lg hover:bg-indigo-700 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50 shadow-xl shadow-indigo-100"
+                   >
+                     {isSaving ? <Loader2 className="animate-spin" /> : <><Plus size={20} /> Publicar Novo Curso</>}
+                   </button>
+                </form>
+             </div>
+          </div>
         )}
       </div>
     </div>
