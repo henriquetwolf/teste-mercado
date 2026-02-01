@@ -27,7 +27,6 @@ import {
   Search,
   ShoppingCart,
   AlertCircle,
-  // Added GraduationCap import to fix "Cannot find name 'GraduationCap'" error
   GraduationCap
 } from 'lucide-react';
 
@@ -59,22 +58,18 @@ export default function Admin() {
   async function fetchData() {
     setLoading(true);
     try {
-      // Configurações
       const { data: configData } = await supabase.from('platform_settings').select('value').eq('key', 'mercadopago_config').maybeSingle();
       if (configData) setMpConfig(configData.value);
 
-      // Cursos
       const { data: coursesData } = await supabase.from('courses').select('*').order('created_at', { ascending: false });
       if (coursesData) setCourses(coursesData);
 
-      // Vendas Locais (Supabase) - Incluindo intenções
       const { data: localSalesData } = await supabase
         .from('sales')
         .select('*, courses(title)')
         .order('created_at', { ascending: false });
       if (localSalesData) setLocalSales(localSalesData);
 
-      // Vendas Reais do Mercado Pago
       if (configData?.value?.accessToken) {
         const sales = await searchPayments(30);
         setMpSales(sales);
@@ -142,7 +137,6 @@ export default function Admin() {
     }
   };
 
-  // Cálculos
   const totalApproved = mpSales
     .filter(s => s.status === 'approved')
     .reduce((acc, s) => acc + (s.transaction_amount || 0), 0);
@@ -161,7 +155,7 @@ export default function Admin() {
         </div>
         <nav className="p-6 space-y-2 flex-grow">
           <NavItem active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<BarChart3 size={20}/>} label="Dashboard" />
-          <NavItem active={activeTab === 'courses'} onClick={() => setActiveTab('courses')} icon={<BookOpen size={20}/>} label="Gerenciar Cursos" />
+          <NavItem active={activeTab === 'courses'} onClick={() => { setActiveTab('courses'); setEditingCourse(null); }} icon={<BookOpen size={20}/>} label="Gerenciar Cursos" />
           <NavItem active={activeTab === 'sales'} onClick={() => setActiveTab('sales')} icon={<CreditCard size={20}/>} label="Vendas & Leads" />
           <NavItem active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<Wallet size={20}/>} label="Configurar API" />
         </nav>
@@ -185,6 +179,15 @@ export default function Admin() {
               </div>
               
               <div className="flex gap-3">
+                {activeTab === 'courses' && !editingCourse && (
+                  <button onClick={() => {
+                     setEditingCourse({ id: null });
+                     setCourseForm({ title: '', instructor: '', price: 0, thumbnail: '', description: '', modules: [] });
+                  }} className="bg-sky-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:bg-sky-700 shadow-xl shadow-sky-200 transition-all active:scale-95">
+                    <Plus size={20} /> Novo Curso
+                  </button>
+                )}
+                
                 <button 
                   onClick={refreshPayments} 
                   disabled={isRefreshing}
@@ -254,18 +257,8 @@ export default function Admin() {
             {activeTab === 'sales' && (
               <div className="space-y-6">
                 <div className="flex bg-white p-2 rounded-2xl border border-slate-200 w-fit">
-                   <button 
-                     onClick={() => setActiveSalesSubTab('local')}
-                     className={`px-6 py-3 rounded-xl font-bold text-xs transition-all ${activeSalesSubTab === 'local' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
-                   >
-                     Intenções & Leads (Sistema)
-                   </button>
-                   <button 
-                     onClick={() => setActiveSalesSubTab('api')}
-                     className={`px-6 py-3 rounded-xl font-bold text-xs transition-all ${activeSalesSubTab === 'api' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
-                   >
-                     Extrato Real (Mercado Pago API)
-                   </button>
+                   <button onClick={() => setActiveSalesSubTab('local')} className={`px-6 py-3 rounded-xl font-bold text-xs transition-all ${activeSalesSubTab === 'local' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>Intenções & Leads (Sistema)</button>
+                   <button onClick={() => setActiveSalesSubTab('api')} className={`px-6 py-3 rounded-xl font-bold text-xs transition-all ${activeSalesSubTab === 'api' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>Extrato Real (Mercado Pago API)</button>
                 </div>
 
                 {activeSalesSubTab === 'local' ? (
@@ -298,9 +291,7 @@ export default function Admin() {
                                      {sale.status === 'Iniciado' ? 'CHECKOUT ABANDONADO' : sale.status}
                                   </span>
                                </td>
-                               <td className="px-8 py-6">
-                                  <div className="text-[10px] font-mono text-slate-400 truncate max-w-[100px]">{sale.mp_preference_id || '-'}</div>
-                               </td>
+                               <td className="px-8 py-6 text-[10px] font-mono text-slate-400">{sale.mp_preference_id || '-'}</td>
                             </tr>
                          ))}
                       </tbody>
@@ -325,22 +316,10 @@ export default function Admin() {
                                   <div className="text-xs font-bold text-slate-900">#{sale.id}</div>
                                   <div className="text-[10px] text-slate-400">{new Date(sale.date_created).toLocaleString()}</div>
                                </td>
-                               <td className="px-8 py-6">
-                                  <div className="text-xs font-bold text-slate-600">{sale.payer?.email}</div>
-                               </td>
-                               <td className="px-8 py-6">
-                                  <span className="text-sm font-black text-slate-900">R$ {sale.transaction_amount?.toFixed(2)}</span>
-                               </td>
-                               <td className="px-8 py-6">
-                                  <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-tight ${getStatusColor(sale.status)}`}>
-                                     {sale.status}
-                                  </span>
-                               </td>
-                               <td className="px-8 py-6 text-right">
-                                  <a href={`https://www.mercadopago.com.br/money-out/transfer/receipt/${sale.id}`} target="_blank" rel="noreferrer" className="p-2 bg-slate-100 text-slate-400 rounded-lg hover:bg-sky-600 hover:text-white transition-all inline-block">
-                                    <ExternalLink size={16} />
-                                  </a>
-                               </td>
+                               <td className="px-8 py-6 text-xs font-bold text-slate-600">{sale.payer?.email}</td>
+                               <td className="px-8 py-6 font-black text-slate-900">R$ {sale.transaction_amount?.toFixed(2)}</td>
+                               <td className="px-8 py-6"><span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${getStatusColor(sale.status)}`}>{sale.status}</span></td>
+                               <td className="px-8 py-6 text-right"><a href={`https://www.mercadopago.com.br/money-out/transfer/receipt/${sale.id}`} target="_blank" rel="noreferrer" className="p-2 bg-slate-100 text-slate-400 rounded-lg hover:bg-sky-600 hover:text-white transition-all inline-block"><ExternalLink size={16} /></a></td>
                             </tr>
                          ))}
                       </tbody>
@@ -351,25 +330,23 @@ export default function Admin() {
             )}
 
             {activeTab === 'settings' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
                 <form onSubmit={saveSettings} className="bg-white p-10 rounded-[40px] border border-slate-200 shadow-sm space-y-6">
                   <div className="flex items-center gap-3 mb-6">
-                     <div className="w-12 h-12 bg-sky-100 text-sky-600 rounded-2xl flex items-center justify-center">
-                        <Key size={24} />
-                     </div>
+                     <div className="w-12 h-12 bg-sky-100 text-sky-600 rounded-2xl flex items-center justify-center"><Key size={24} /></div>
                      <h2 className="text-xl font-black text-slate-900 tracking-tight">Credenciais da API</h2>
                   </div>
                   <div className="space-y-5">
                     <div>
                       <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">Public Key</label>
-                      <input value={mpConfig.publicKey} onChange={e => setMpConfig({...mpConfig, publicKey: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-mono text-xs" />
+                      <input value={mpConfig.publicKey} onChange={e => setMpConfig({...mpConfig, publicKey: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-mono text-xs focus:ring-4 focus:ring-sky-50 outline-none transition-all" />
                     </div>
                     <div>
                       <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">Access Token</label>
-                      <input type="password" value={mpConfig.accessToken} onChange={e => setMpConfig({...mpConfig, accessToken: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-mono text-xs" />
+                      <input type="password" value={mpConfig.accessToken} onChange={e => setMpConfig({...mpConfig, accessToken: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-mono text-xs focus:ring-4 focus:ring-sky-50 outline-none transition-all" />
                     </div>
                   </div>
-                  <button type="submit" disabled={isSaving} className="w-full bg-sky-600 text-white py-5 rounded-2xl font-black hover:bg-sky-700 transition-all">
+                  <button type="submit" disabled={isSaving} className="w-full bg-sky-600 text-white py-5 rounded-2xl font-black text-lg hover:bg-sky-700 transition-all shadow-xl shadow-sky-100 active:scale-[0.98]">
                      {isSaving ? <Loader2 className="animate-spin mx-auto" /> : 'Salvar Configurações'}
                   </button>
                 </form>
@@ -392,26 +369,27 @@ export default function Admin() {
                     </div>
                     <div className="space-y-6">
                       <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">URL da Thumbnail</label>
-                      <input value={courseForm.thumbnail} onChange={e => setCourseForm({...courseForm, thumbnail: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl" />
+                      <input value={courseForm.thumbnail} onChange={e => setCourseForm({...courseForm, thumbnail: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-sky-100 outline-none transition-all" />
                     </div>
                   </div>
                   <div className="flex gap-4">
-                    <button type="button" onClick={() => setEditingCourse(null)} className="flex-1 bg-slate-100 text-slate-500 py-5 rounded-2xl font-black">Cancelar</button>
-                    <button type="submit" disabled={isSaving} className="flex-[2] bg-sky-600 text-white py-5 rounded-2xl font-black hover:bg-sky-700">Salvar Alterações</button>
+                    <button type="button" onClick={() => setEditingCourse(null)} className="flex-1 bg-slate-100 text-slate-500 py-5 rounded-2xl font-black hover:bg-slate-200 transition-colors">Cancelar</button>
+                    <button type="submit" disabled={isSaving} className="flex-[2] bg-sky-600 text-white py-5 rounded-2xl font-black hover:bg-sky-700 shadow-xl shadow-sky-100 active:scale-[0.98]">Salvar Alterações</button>
                   </div>
                 </form>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-fade-in">
                   {courses.map(course => (
-                    <div key={course.id} className="bg-white rounded-[32px] border border-slate-200 overflow-hidden group flex flex-col">
+                    <div key={course.id} className="bg-white rounded-[32px] border border-slate-200 overflow-hidden group flex flex-col hover:shadow-2xl transition-all duration-500">
                       <div className="aspect-video relative overflow-hidden">
                         <img src={course.thumbnail} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        <div className="absolute top-4 right-4 bg-sky-600 text-white px-3 py-1 rounded-full text-[10px] font-black uppercase">R$ {course.price.toFixed(2)}</div>
                       </div>
                       <div className="p-8 flex-grow flex flex-col">
                         <h3 className="font-black text-slate-900 mb-6 text-xl line-clamp-2">{course.title}</h3>
-                        <div className="flex justify-between items-center pt-6 border-t mt-auto">
+                        <div className="flex justify-between items-center pt-6 border-t mt-auto border-slate-50">
                           <button onClick={() => { setEditingCourse(course); setCourseForm({...course}); }} className="p-3 bg-slate-50 text-slate-400 hover:bg-sky-600 hover:text-white rounded-xl transition-all"><Edit3 size={18}/></button>
-                          <span className="text-[10px] font-black text-sky-600 uppercase">R$ {course.price.toFixed(2)}</span>
+                          <span className="text-[10px] font-black text-emerald-500 uppercase flex items-center gap-1">Publicado</span>
                         </div>
                       </div>
                     </div>
@@ -426,7 +404,6 @@ export default function Admin() {
   );
 }
 
-// Subcomponentes
 const NavItem = ({ active, onClick, icon, label }: any) => (
   <button onClick={onClick} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all font-bold text-sm ${active ? 'bg-sky-600 text-white shadow-lg shadow-sky-600/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
     {icon} {label}
@@ -434,11 +411,9 @@ const NavItem = ({ active, onClick, icon, label }: any) => (
 );
 
 const StatCard = ({ label, value, subtext, icon, color }: any) => (
-  <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm relative overflow-hidden group">
+  <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm relative overflow-hidden group hover:border-sky-200 transition-all">
     <div className="relative z-10">
-      <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center mb-6">
-        {icon}
-      </div>
+      <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center mb-6">{icon}</div>
       <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">{label}</p>
       <h4 className="text-3xl font-black text-slate-900 mb-2">{value}</h4>
       <p className="text-[10px] font-bold text-slate-400 uppercase opacity-70">{subtext}</p>
