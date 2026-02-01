@@ -63,7 +63,6 @@ export default function Admin() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  // Mercado Pago Admin Config Completa
   const [mpConfig, setMpConfig] = useState({
     publicKey: '',
     accessToken: ''
@@ -76,7 +75,6 @@ export default function Admin() {
   async function loadAllData() {
     if (!refreshing) setLoading(true);
     try {
-      // 1. Métricas Globais
       const { count: usersCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
       const { count: coursesCount } = await supabase.from('courses').select('*', { count: 'exact', head: true });
       const { data: salesData } = await supabase.from('sales').select('amount, status').eq('status', 'Pago');
@@ -92,11 +90,9 @@ export default function Admin() {
         platformFee: totalPlatformFee
       });
 
-      // 2. Lista de Usuários
       const { data: users } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
       if (users) setUsersList(users);
 
-      // 3. Histórico de Vendas (Resiliente)
       const { data: salesHistory, error: salesError } = await supabase
         .from('sales')
         .select(`
@@ -107,15 +103,13 @@ export default function Admin() {
         .order('created_at', { ascending: false });
       
       if (salesError) {
-        console.error("Erro na query de vendas:", salesError);
-        // Fallback simples se o join falhar por razões de constraint
+        console.error("Erro na query de vendas complexa, tentando simples:", salesError);
         const { data: simpleSales } = await supabase.from('sales').select('*').order('created_at', { ascending: false });
         if (simpleSales) setSalesList(simpleSales);
       } else if (salesHistory) {
         setSalesList(salesHistory);
       }
 
-      // 4. Configuração Master
       const { data: config } = await supabase.from('platform_settings').select('value').eq('key', 'mercadopago_config').maybeSingle();
       if (config?.value) {
         setMpConfig({
@@ -144,7 +138,7 @@ export default function Admin() {
         }, { onConflict: 'key' });
       
       if (error) throw error;
-      alert("Configuração Master do Mercado Pago salva com sucesso!");
+      alert("Configuração Master salva!");
     } catch (err: any) {
       alert("Erro ao salvar: " + err.message);
     } finally {
@@ -175,7 +169,6 @@ export default function Admin() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Hero Master Admin */}
       <div className="bg-slate-950 text-white p-12 lg:p-20 relative overflow-hidden">
         <div className="max-w-7xl mx-auto flex flex-col lg:flex-row justify-between items-center gap-12 relative z-10">
            <div className="space-y-6 text-center lg:text-left">
@@ -192,7 +185,6 @@ export default function Admin() {
                 <button onClick={() => setActiveTab('settings')} className={`whitespace-nowrap px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'settings' ? 'bg-white text-slate-950 shadow-xl' : 'text-white/50 hover:text-white'}`}>Ajustes</button>
               </div>
            </div>
-           
            <div className="flex gap-6">
               <div className="bg-white/5 border border-white/10 p-10 rounded-[48px] backdrop-blur-xl group hover:bg-white/10 transition-all">
                  <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2">Comissões Coletadas (1%)</p>
@@ -215,7 +207,6 @@ export default function Admin() {
                 <GlobalStat label="Cursos" value={stats.courses.toString()} icon={<BookOpen size={20} />} />
                 <GlobalStat label="Uptime" value="99.9%" icon={<Globe size={20} />} />
             </div>
-
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 mt-16">
                 <div className="lg:col-span-2 space-y-12">
                    <section className="bg-white p-12 rounded-[48px] border border-slate-200 shadow-sm">
@@ -223,23 +214,18 @@ export default function Admin() {
                         <h3 className="text-2xl font-black text-slate-900 uppercase italic tracking-tighter flex items-center gap-4">
                            <TrendingUp className="text-indigo-600" /> Fluxo de Comissões
                         </h3>
-                        <button 
-                          onClick={() => { setRefreshing(true); loadAllData(); }}
-                          className="p-2 text-slate-400 hover:text-indigo-600 transition-colors"
-                          title="Recarregar dados"
-                        >
+                        <button onClick={() => { setRefreshing(true); loadAllData(); }} className="p-2 text-slate-400 hover:text-indigo-600 transition-colors">
                           <RefreshCw size={18} className={refreshing ? "animate-spin" : ""} />
                         </button>
                       </div>
                       <div className="aspect-video bg-slate-50 rounded-[32px] border-2 border-dashed border-slate-100 flex items-center justify-center">
                          <div className="text-center space-y-4">
                             <Zap size={40} className="mx-auto text-slate-200" />
-                            <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">Relatório de Marketplace Dinâmico v2.1</p>
+                            <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">Relatório de Marketplace Dinâmico</p>
                          </div>
                       </div>
                    </section>
                 </div>
-
                 <aside className="space-y-8">
                    <div className="bg-slate-900 text-white p-12 rounded-[48px] shadow-2xl relative overflow-hidden group">
                       <div className="relative z-10 space-y-8">
@@ -249,14 +235,9 @@ export default function Admin() {
                          </div>
                          <div className="space-y-6">
                             <StatusLine label="Split Engine" status="ACTIVE" />
-                            <StatusLine label="Teacher Payouts" status="INSTANT" />
                             <StatusLine label="Platform Fee" status="1.0% FIXED" />
                          </div>
-                         <button onClick={() => setActiveTab('settings')} className="w-full bg-white/10 hover:bg-white text-slate-400 hover:text-slate-900 py-4 rounded-2xl text-[10px] font-black uppercase transition-all tracking-widest border border-white/5">
-                            Gerenciar Chaves Master
-                         </button>
                       </div>
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-600 opacity-[0.05] rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
                    </div>
                 </aside>
             </div>
@@ -268,68 +249,32 @@ export default function Admin() {
               <div className="p-8 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
                 <div className="flex items-center gap-3">
                    <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center"><Users size={20} className="text-slate-900" /></div>
-                   <h3 className="text-xl font-black uppercase italic tracking-tighter">Gerenciamento de Usuários</h3>
+                   <h3 className="text-xl font-black uppercase italic tracking-tighter">Usuários</h3>
                 </div>
-                <div className="relative w-full md:w-96">
-                   <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                   <input 
-                      type="text" 
-                      placeholder="Buscar por nome ou ID..." 
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:ring-4 focus:ring-indigo-50 outline-none transition-all"
-                   />
-                </div>
+                <input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full md:w-80 pl-4 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:ring-4 focus:ring-indigo-50 outline-none" />
               </div>
-
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-slate-50 border-b border-slate-100">
+                  <thead className="bg-slate-50">
                     <tr>
-                      <th className="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Usuário</th>
-                      <th className="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Perfil</th>
-                      <th className="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">ID Supabase</th>
-                      <th className="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Cadastro em</th>
-                      <th className="px-8 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Ações</th>
+                      <th className="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase">Usuário</th>
+                      <th className="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase">Perfil</th>
+                      <th className="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase">Cadastro</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {filteredUsers.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="p-20 text-center text-slate-400 font-bold uppercase text-xs">Nenhum usuário encontrado...</td>
+                  <tbody>
+                    {filteredUsers.map((user) => (
+                      <tr key={user.id} className="border-b border-slate-50">
+                        <td className="px-8 py-6">
+                          <p className="text-sm font-black text-slate-900">{user.full_name || 'Usuário'}</p>
+                          <p className="text-[10px] font-bold text-slate-400">{user.id}</p>
+                        </td>
+                        <td className="px-8 py-6">
+                          <span className="px-3 py-1 bg-slate-100 rounded-full text-[9px] font-black uppercase tracking-widest">{user.role}</span>
+                        </td>
+                        <td className="px-8 py-6 text-[11px] font-bold text-slate-500 uppercase">{new Date(user.created_at).toLocaleDateString()}</td>
                       </tr>
-                    ) : (
-                      filteredUsers.map((user) => (
-                        <tr key={user.id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-8 py-6">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center font-black text-indigo-600 text-xs">
-                                {user.full_name?.charAt(0).toUpperCase() || 'U'}
-                              </div>
-                              <div>
-                                <p className="text-sm font-black text-slate-900">{user.full_name || 'Sem Nome'}</p>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase">{user.id.slice(0, 8)}...</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-8 py-6">
-                            <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
-                              user.role === 'instructor' ? 'bg-amber-50 border-amber-100 text-amber-600' : 'bg-sky-50 border-sky-100 text-sky-600'
-                            }`}>
-                              {user.role === 'instructor' ? <Briefcase size={12} /> : <UserCheck size={12} />}
-                              {user.role === 'instructor' ? 'Professor' : 'Aluno'}
-                            </div>
-                          </td>
-                          <td className="px-8 py-6 text-xs font-mono text-slate-400">{user.id}</td>
-                          <td className="px-8 py-6 text-[11px] font-bold text-slate-500 uppercase">
-                            {new Date(user.created_at).toLocaleDateString('pt-BR')}
-                          </td>
-                          <td className="px-8 py-6 text-center">
-                            <button className="p-2 text-slate-300 hover:text-indigo-600 transition-colors"><Mail size={16} /></button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -338,78 +283,40 @@ export default function Admin() {
 
          {activeTab === 'sales' && (
            <div className="bg-white rounded-[40px] border border-slate-200 shadow-xl overflow-hidden animate-fade-in">
-              <div className="p-8 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
-                <div className="flex items-center gap-3">
-                   <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center"><History size={20} className="text-slate-900" /></div>
-                   <h3 className="text-xl font-black uppercase italic tracking-tighter">Histórico de Transações</h3>
-                </div>
-                <div className="flex items-center gap-4 w-full md:w-auto">
-                   <button 
-                     onClick={() => { setRefreshing(true); loadAllData(); }}
-                     className="p-3 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-all text-slate-400 hover:text-indigo-600"
-                   >
-                      <RefreshCw size={18} className={refreshing ? "animate-spin" : ""} />
-                   </button>
-                   <div className="relative w-full md:w-80">
-                      <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input 
-                         type="text" 
-                         placeholder="Buscar por curso ou aluno..." 
-                         value={searchTerm}
-                         onChange={(e) => setSearchTerm(e.target.value)}
-                         className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:ring-4 focus:ring-indigo-50 outline-none transition-all"
-                      />
-                   </div>
+              <div className="p-8 border-b border-slate-100 flex justify-between items-center">
+                <h3 className="text-xl font-black uppercase italic tracking-tighter">Histórico de Vendas</h3>
+                <div className="flex items-center gap-4">
+                   <button onClick={() => { setRefreshing(true); loadAllData(); }} className="p-3 bg-slate-50 rounded-2xl"><RefreshCw size={18} className={refreshing ? "animate-spin" : ""} /></button>
+                   <input type="text" placeholder="Filtrar vendas..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-4 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold outline-none w-64" />
                 </div>
               </div>
-
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-slate-50 border-b border-slate-100">
+                  <thead className="bg-slate-50">
                     <tr>
-                      <th className="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Aluno / Curso</th>
-                      <th className="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor Bruto</th>
-                      <th className="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                      <th className="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Data</th>
-                      <th className="px-8 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Referência MP</th>
+                      <th className="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase">Aluno/Curso</th>
+                      <th className="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase">Valor</th>
+                      <th className="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase">Status</th>
+                      <th className="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase">Data</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {filteredSales.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="p-20 text-center text-slate-400 font-bold uppercase text-xs">Nenhuma venda encontrada na base de dados.</td>
+                  <tbody>
+                    {filteredSales.map((sale) => (
+                      <tr key={sale.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                        <td className="px-8 py-6">
+                           <p className="text-sm font-black text-slate-900">{sale.user?.full_name || 'Aluno #' + sale.user_id?.slice(0,5)}</p>
+                           <p className="text-[10px] font-bold text-indigo-600 uppercase italic">{sale.course?.title || 'Curso #' + sale.course_id?.slice(0,5)}</p>
+                        </td>
+                        <td className="px-8 py-6">
+                           <p className="text-sm font-black text-slate-900">R$ {Number(sale.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                           <p className="text-[9px] font-bold text-slate-400 uppercase">Fee: R$ {(Number(sale.amount) * 0.01).toFixed(2)}</p>
+                        </td>
+                        <td className="px-8 py-6">
+                           <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase border ${sale.status === 'Pago' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-amber-50 border-amber-100 text-amber-600'}`}>{sale.status || 'Pendente'}</span>
+                        </td>
+                        <td className="px-8 py-6 text-[11px] font-bold text-slate-500 uppercase">{new Date(sale.created_at).toLocaleString()}</td>
                       </tr>
-                    ) : (
-                      filteredSales.map((sale) => (
-                        <tr key={sale.id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-8 py-6">
-                            <div>
-                               <p className="text-sm font-black text-slate-900">{sale.user?.full_name || 'Aluno #' + (sale.user_id?.slice(0,5) || '...')}</p>
-                               <p className="text-[10px] font-bold text-indigo-600 uppercase italic">{sale.course?.title || 'Curso #' + (sale.course_id?.slice(0,5) || '...')}</p>
-                            </div>
-                          </td>
-                          <td className="px-8 py-6">
-                            <p className="text-sm font-black text-slate-900">R$ {Number(sale.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Taxa Plataforma: R$ {(Number(sale.amount) * 0.01).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                          </td>
-                          <td className="px-8 py-6">
-                            <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
-                              sale.status === 'Pago' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 
-                              sale.status === 'Iniciado' ? 'bg-amber-50 border-amber-100 text-amber-600' : 'bg-rose-50 border-rose-100 text-rose-600'
-                            }`}>
-                              {sale.status === 'Pago' ? <CheckCircle2 size={12} /> : <Clock size={12} />}
-                              {sale.status || 'Pendente'}
-                            </div>
-                          </td>
-                          <td className="px-8 py-6 text-[11px] font-bold text-slate-500 uppercase">
-                            {new Date(sale.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
-                          </td>
-                          <td className="px-8 py-6 text-center text-[10px] font-mono text-slate-400">
-                             {sale.mp_payment_id || sale.mp_preference_id?.slice(0,10) || '---'}
-                          </td>
-                        </tr>
-                      ))
-                    )}
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -420,83 +327,26 @@ export default function Admin() {
            <div className="max-w-3xl mx-auto animate-fade-in space-y-12">
               <section className="bg-white p-12 rounded-[48px] border border-slate-200 shadow-xl space-y-8">
                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-slate-950 text-white rounded-2xl flex items-center justify-center shadow-2xl">
-                       <Settings size={28} />
-                    </div>
+                    <div className="w-14 h-14 bg-slate-950 text-white rounded-2xl flex items-center justify-center shadow-2xl"><Settings size={28} /></div>
                     <div>
                        <h3 className="text-2xl font-black italic uppercase tracking-tighter">Configuração Master Gateway</h3>
-                       <p className="text-slate-500 text-sm font-medium">Define as credenciais globais para recebimento de taxas e processamento do marketplace.</p>
+                       <p className="text-slate-500 text-sm font-medium">Define as credenciais globais para recebimento de taxas.</p>
                     </div>
                  </div>
-
-                 <div className="p-6 bg-indigo-50 border border-indigo-100 rounded-3xl flex items-start gap-4">
-                    <AlertCircle className="text-indigo-600 shrink-0 mt-1" size={20} />
-                    <div className="space-y-2">
-                       <p className="text-xs text-indigo-700 font-bold leading-relaxed uppercase">
-                          IMPORTANTE: O Access Token Master é utilizado para processar o split de 1% (Marketplace Fee).
-                       </p>
-                       <p className="text-[10px] text-indigo-400 font-medium">
-                          Mantenha estas chaves seguras. Elas permitem o controle das transações da plataforma.
-                       </p>
-                    </div>
-                 </div>
-
                  <div className="grid grid-cols-1 gap-8">
                     <div>
                         <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">Public Key Master (MP)</label>
-                        <div className="relative">
-                           <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                           <input 
-                              type="text" 
-                              value={mpConfig.publicKey}
-                              onChange={(e) => setMpConfig({ ...mpConfig, publicKey: e.target.value })}
-                              placeholder="APP_USR-..."
-                              className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 pl-12 pr-4 font-mono text-xs focus:ring-4 focus:ring-indigo-50 outline-none transition-all"
-                           />
-                        </div>
+                        <input type="text" value={mpConfig.publicKey} onChange={(e) => setMpConfig({ ...mpConfig, publicKey: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 px-4 font-mono text-xs outline-none" />
                     </div>
                     <div>
                         <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">Access Token Master (MP)</label>
-                        <div className="relative">
-                           <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                           <input 
-                              type="password" 
-                              value={mpConfig.accessToken}
-                              onChange={(e) => setMpConfig({ ...mpConfig, accessToken: e.target.value })}
-                              placeholder="APP_USR-..."
-                              className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 pl-12 pr-4 font-mono text-xs focus:ring-4 focus:ring-indigo-50 outline-none transition-all"
-                           />
-                        </div>
-                        <p className="mt-2 text-[9px] text-slate-400 font-bold uppercase">Token de Produção disponível em: Painel de Desenvolvedor > Minhas Aplicações.</p>
+                        <input type="password" value={mpConfig.accessToken} onChange={(e) => setMpConfig({ ...mpConfig, accessToken: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 px-4 font-mono text-xs outline-none" />
+                        <p className="mt-2 text-[9px] text-slate-400 font-bold uppercase">Token de Produção disponível em: Painel de Desenvolvedor &gt; Minhas Aplicações.</p>
                     </div>
                  </div>
-
-                 <button 
-                    onClick={handleSaveConfig}
-                    disabled={isSaving}
-                    className="w-full bg-slate-950 text-white py-6 rounded-3xl font-black text-lg hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
-                 >
+                 <button onClick={handleSaveConfig} disabled={isSaving} className="w-full bg-slate-950 text-white py-6 rounded-3xl font-black text-lg hover:bg-slate-800 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50">
                     {isSaving ? <Loader2 className="animate-spin" /> : <><Save size={20} /> Salvar Configurações Master</>}
                  </button>
-              </section>
-
-              <section className="bg-slate-900 p-12 rounded-[48px] text-white">
-                 <h4 className="text-lg font-black italic uppercase tracking-tighter mb-6 flex items-center gap-2">
-                    <Zap className="text-indigo-400" size={20} /> Engine de Marketplace
-                 </h4>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="p-6 bg-white/5 rounded-3xl border border-white/10 space-y-2">
-                       <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Comissão Plataforma</p>
-                       <p className="text-3xl font-black italic">1.00%</p>
-                    </div>
-                    <div className="p-6 bg-white/5 rounded-3xl border border-white/10 space-y-2">
-                       <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Gateway Ativo</p>
-                       <div className="flex items-center gap-2">
-                          <CheckCircle2 className="text-emerald-400" size={20} />
-                          <p className="text-xl font-black uppercase tracking-tight">Mercado Pago</p>
-                       </div>
-                    </div>
-                 </div>
               </section>
            </div>
          )}
