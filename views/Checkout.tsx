@@ -1,76 +1,63 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ShieldCheck, Lock, CreditCard, ChevronLeft, AlertTriangle, Loader2, ExternalLink, Info, Wallet, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, Lock, CreditCard, ChevronLeft, Loader2, Wallet, CheckCircle2, ArrowRight } from 'lucide-react';
 import { COURSES } from '../constants';
 import { supabase } from '../services/supabase';
+import { createPreference } from '../services/mercadoPago';
 
-interface Props {
-  onComplete: (id: string) => void;
-}
-
-declare global {
-  interface Window {
-    MercadoPago: any;
-  }
-}
-
-export default function Checkout({ onComplete }: Props) {
+export default function Checkout({ onComplete }: { onComplete: (id: string) => void }) {
   const { courseId } = useParams();
   const navigate = useNavigate();
   const [course, setCourse] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [mpInitialized, setMpInitialized] = useState(false);
+  const [preferenceId, setPreferenceId] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    fetchCourseAndSettings();
+    loadData();
   }, []);
 
-  async function fetchCourseAndSettings() {
+  async function loadData() {
+    setLoading(true);
     try {
-      // 1. Buscar curso
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user);
+
       const { data: courseData } = await supabase.from('courses').select('*').eq('id', courseId).maybeSingle();
       const finalCourse = courseData || COURSES.find(c => c.id === courseId);
       setCourse(finalCourse);
-
-      // 2. Tentar inicializar Mercado Pago se houver Public Key no banco
-      const { data: configData } = await supabase.from('platform_settings').select('value').eq('key', 'mercadopago_config').maybeSingle();
-      
-      if (configData?.value?.publicKey && window.MercadoPago) {
-        new window.MercadoPago(configData.value.publicKey, { locale: 'pt-BR' });
-        setMpInitialized(true);
-      }
     } catch (err) {
-      console.error("Erro no checkout:", err);
+      console.error(err);
     } finally {
       setLoading(false);
     }
   }
 
-  const handlePaymentInitiation = async () => {
-    if (!course) return;
-    setIsProcessing(true);
-
+  const handleStartPayment = async () => {
+    if (!course || !user) return;
+    setIsGenerating(true);
     try {
-      // Registrar intenção de compra no banco
-      await onComplete(course.id);
+      const id = await createPreference(course, user);
+      setPreferenceId(id);
+      
+      // Registrar intenção de compra
+      await supabase.from('sales').insert({
+        user_id: user.id,
+        course_id: course.id,
+        amount: course.price,
+        status: 'Iniciado',
+        mp_preference_id: id
+      });
 
-      if (course.payment_link) {
-        // Se já temos um link direto (preferência criada manualmente ou via API externa)
-        window.location.href = course.payment_link;
-      } else {
-        // Simulação de criação de preferência via API caso o link não esteja setado
-        alert("Iniciando Checkout Seguro... Você será redirecionado para o ambiente de pagamento do Mercado Pago.");
-        // Em um sistema real, aqui chamaríamos uma Edge Function para gerar o preferenceId
-        // Por enquanto, usamos o redirecionamento para o link configurado no Admin
-        alert("Aviso: O link de pagamento não foi configurado para este curso no painel admin.");
-      }
-    } catch (err) {
-      console.error("Erro ao processar pagamento:", err);
+      // Redirecionar para o Checkout Pro do Mercado Pago
+      window.location.href = `https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=${id}`;
+    } catch (err: any) {
+      alert("Erro ao gerar pagamento: " + err.message);
     } finally {
-      setIsProcessing(false);
+      setIsGenerating(false);
     }
   };
 
@@ -85,88 +72,92 @@ export default function Checkout({ onComplete }: Props) {
         </button>
 
         <div className="bg-white rounded-[40px] shadow-2xl border border-slate-200 overflow-hidden flex flex-col md:flex-row">
-          {/* Lado Esquerdo: Resumo */}
-          <div className="flex-1 p-12 bg-sky-50/50 border-r border-slate-100">
-            <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mb-8 border border-sky-100">
-               <Wallet className="text-sky-600" size={32} />
+          <div className="flex-1 p-12 bg-slate-900 text-white">
+            <div className="w-16 h-16 bg-sky-500 rounded-2xl flex items-center justify-center mb-8 shadow-lg shadow-sky-500/20">
+               <Wallet size={32} />
             </div>
-            <h2 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">Finalizar Matrícula</h2>
-            <p className="text-slate-500 mb-8 text-sm">Você está a um passo de transformar sua carreira com o curso <strong>{course.title}</strong>.</p>
+            <h2 className="text-3xl font-black mb-2">Resumo do Pedido</h2>
+            <p className="text-slate-400 mb-8 text-sm">Você está adquirindo acesso vitalício ao treinamento.</p>
             
-            <div className="space-y-4 mb-8">
-              <div className="flex justify-between text-slate-400 text-[10px] font-black uppercase">
-                <span>Investimento</span>
-                <span>R$ {course.price.toFixed(2)}</span>
+            <div className="space-y-6 mb-12">
+              <div className="flex justify-between items-center p-4 bg-white/5 rounded-2xl border border-white/10">
+                <div>
+                  <div className="text-xs font-bold text-sky-400 uppercase mb-1">Produto</div>
+                  <div className="text-sm font-bold line-clamp-1">{course.title}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs font-bold text-slate-500 uppercase mb-1">Preço</div>
+                  <div className="text-sm font-bold">R$ {course.price.toFixed(2)}</div>
+                </div>
               </div>
-              <div className="flex justify-between items-end text-slate-900">
-                <span className="text-sm font-bold">Total a pagar</span>
-                <span className="text-4xl font-black text-sky-600">R$ {course.price.toFixed(2)}</span>
+
+              <div className="flex justify-between items-end border-t border-white/10 pt-6">
+                <span className="text-sm font-bold text-slate-400">Total a pagar agora</span>
+                <span className="text-4xl font-black text-sky-400">R$ {course.price.toFixed(2)}</span>
               </div>
             </div>
 
-            <div className="space-y-4">
-               <div className="flex items-center gap-3 text-emerald-600 bg-white p-4 rounded-2xl border border-emerald-100 shadow-sm">
-                  <ShieldCheck size={20} />
-                  <span className="text-xs font-bold uppercase tracking-tight">Pagamento 100% Protegido</span>
-               </div>
-               <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-white p-3 rounded-xl border border-slate-100 text-[10px] text-slate-400 font-bold text-center">
-                    PIX INSTANTÂNEO
-                  </div>
-                  <div className="bg-white p-3 rounded-xl border border-slate-100 text-[10px] text-slate-400 font-bold text-center">
-                    CARTÃO EM 12X
-                  </div>
+            <div className="space-y-3">
+               <div className="flex items-center gap-3 text-emerald-400 text-[10px] font-black uppercase tracking-widest">
+                  <ShieldCheck size={16} /> Pagamento Processado pelo Mercado Pago
                </div>
             </div>
           </div>
 
-          {/* Lado Direito: Ação */}
-          <div className="flex-1 p-12 flex flex-col justify-center items-center text-center">
-            <img 
-              src="https://imgmp.mlstatic.com/resources/frontend/statics/ml-uikit/resources/utils/checkouts/mercadopago-logo.png" 
-              alt="Mercado Pago" 
-              className="h-8 mb-8 grayscale opacity-50"
-            />
-            
-            {!course.payment_link ? (
-              <div className="bg-amber-50 border border-amber-200 p-6 rounded-3xl text-amber-700 max-w-xs">
-                <AlertTriangle className="mx-auto mb-3" />
-                <h4 className="font-bold text-sm mb-1">Ação Requerida</h4>
-                <p className="text-[10px] leading-relaxed">O administrador precisa vincular um link de pagamento do Mercado Pago a este curso no painel.</p>
+          <div className="flex-1 p-12 flex flex-col justify-center items-center text-center bg-white">
+            <div className="mb-10">
+              <img 
+                src="https://imgmp.mlstatic.com/resources/frontend/statics/ml-uikit/resources/utils/checkouts/mercadopago-logo.png" 
+                alt="Mercado Pago" 
+                className="h-6 mx-auto mb-2"
+              />
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Ambiente Seguro & Criptografado</p>
+            </div>
+
+            <div className="w-full space-y-6">
+              <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 text-left">
+                <h4 className="font-black text-slate-900 text-sm mb-4 flex items-center gap-2">
+                  <CheckCircle2 size={18} className="text-emerald-500" /> 
+                  O que acontece após o pagamento?
+                </h4>
+                <ul className="space-y-3">
+                  <li className="flex gap-3 text-[11px] text-slate-500 font-medium">
+                    <div className="w-5 h-5 rounded-full bg-white border flex items-center justify-center shrink-0">1</div>
+                    Aprovação instantânea via PIX ou Cartão.
+                  </li>
+                  <li className="flex gap-3 text-[11px] text-slate-500 font-medium">
+                    <div className="w-5 h-5 rounded-full bg-white border flex items-center justify-center shrink-0">2</div>
+                    Acesso imediato à área de membros.
+                  </li>
+                </ul>
               </div>
-            ) : (
-              <div className="w-full space-y-6">
-                <div className="space-y-2">
-                   <h3 className="text-xl font-bold text-slate-900">Método Escolhido</h3>
-                   <div className="inline-flex items-center gap-2 bg-sky-100 text-sky-700 px-4 py-2 rounded-full text-xs font-black">
-                      <CreditCard size={14} /> MERCADO PAGO CHECKOUT
-                   </div>
-                </div>
 
-                <button 
-                  onClick={handlePaymentInitiation}
-                  disabled={isProcessing}
-                  className="w-full bg-[#009EE3] text-white py-6 rounded-3xl font-black text-xl hover:bg-[#007db3] shadow-xl shadow-sky-100 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50 group"
-                >
-                  {isProcessing ? (
-                    <Loader2 className="animate-spin" />
-                  ) : (
-                    <>
-                      PAGAR AGORA
-                      <ExternalLink size={20} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-                    </>
-                  )}
-                </button>
+              <button 
+                onClick={handleStartPayment}
+                disabled={isGenerating}
+                className="w-full bg-[#009EE3] text-white py-6 rounded-3xl font-black text-xl hover:bg-[#007db3] shadow-xl shadow-sky-100 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50 group"
+              >
+                {isGenerating ? (
+                  <Loader2 className="animate-spin" />
+                ) : (
+                  <>
+                    GERAR PAGAMENTO
+                    <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                  </>
+                )}
+              </button>
 
-                <p className="text-[10px] text-slate-400 font-medium">
-                  Ao clicar em pagar, você será levado ao ambiente seguro do Mercado Pago para concluir a transação com PIX, Cartão ou Boleto.
-                </p>
+              <div className="flex items-center justify-center gap-4 grayscale opacity-40">
+                <div className="px-2 py-1 border rounded text-[8px] font-black uppercase">PIX</div>
+                <div className="px-2 py-1 border rounded text-[8px] font-black uppercase">Visa</div>
+                <div className="px-2 py-1 border rounded text-[8px] font-black uppercase">Master</div>
+                <div className="px-2 py-1 border rounded text-[8px] font-black uppercase">Boleto</div>
               </div>
-            )}
+            </div>
 
-            <div className="mt-12 flex items-center gap-4 grayscale opacity-30">
-               <Lock size={16} />
-               <span className="text-[10px] font-bold uppercase tracking-widest">SSL Secure Checkout</span>
+            <div className="mt-12 flex items-center gap-2 text-slate-300">
+               <Lock size={12} />
+               <span className="text-[9px] font-bold uppercase tracking-widest">SSL 256-bit Encrypted</span>
             </div>
           </div>
         </div>
