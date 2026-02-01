@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
-import { GraduationCap, User, ShoppingCart, Settings, LogOut, Loader2, AlertTriangle, Database, ExternalLink, Shield } from 'lucide-react';
+import { GraduationCap, User, ShoppingCart, Settings, LogOut, Loader2, AlertTriangle, Database, ExternalLink, Shield, Presentation } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from './services/supabase';
 import Home from './views/Home.tsx';
 import CourseDetails from './views/CourseDetails.tsx';
@@ -10,6 +10,7 @@ import Checkout from './views/Checkout.tsx';
 import MyCourses from './views/MyCourses.tsx';
 import Admin from './views/Admin.tsx';
 import Auth from './views/Auth.tsx';
+import InstructorDashboard from './views/InstructorDashboard.tsx';
 import { COURSES } from './constants';
 
 const ADMIN_EMAIL = 'wolf@wolf.com';
@@ -27,13 +28,17 @@ const Header = ({ cartCount, user }: { cartCount: number, user: any }) => {
             <span>EduVantage</span>
           </Link>
 
-          <div className="flex items-center gap-4 md:gap-8 text-slate-600 font-medium">
+          <div className="flex items-center gap-4 md:gap-8 text-slate-600 font-medium text-sm">
             <Link to="/" className="hidden md:block hover:text-sky-600 transition-colors">Explorar</Link>
             
             <div className="flex items-center gap-4">
               {user ? (
                 <>
-                  <Link to="/my-courses" className="hover:text-sky-600 transition-colors">Meus Cursos</Link>
+                  <Link to="/my-courses" className="hover:text-sky-600 transition-colors hidden sm:block">Meus Cursos</Link>
+                  <Link to="/instructor" className="flex items-center gap-2 text-indigo-600 font-bold hover:bg-indigo-50 px-3 py-2 rounded-lg transition-all">
+                    <Presentation size={18} />
+                    <span className="hidden md:inline">Painel do Professor</span>
+                  </Link>
                   <div className="relative">
                     <ShoppingCart className="w-6 h-6 text-slate-400" />
                     {cartCount > 0 && <span className="absolute -top-2 -right-2 bg-sky-600 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">{cartCount}</span>}
@@ -106,7 +111,7 @@ export default function App() {
         course_id: courseId,
         amount: course?.price || 0,
         status: 'Pendente',
-        payment_method: 'Mercado Pago'
+        payment_method: 'Gateway'
       });
     } catch (err) {
       console.error("Purchase registration error:", err);
@@ -127,12 +132,13 @@ export default function App() {
             <Route path="/classroom/:courseId" element={user ? <Classroom /> : <Navigate to="/auth" />} />
             <Route path="/checkout/:courseId" element={user ? <Checkout onComplete={onPurchaseComplete} /> : <Navigate to="/auth" />} />
             <Route path="/my-courses" element={user ? <MyCourses /> : <Navigate to="/auth" />} />
+            <Route path="/instructor/*" element={user ? <InstructorDashboard /> : <Navigate to="/auth" />} />
             <Route path="/admin" element={isAdmin ? <Admin /> : <Navigate to="/" />} />
           </Routes>
         </main>
         <footer className="bg-slate-900 text-slate-400 py-12">
           <div className="max-w-7xl mx-auto px-4 text-center text-xs">
-            © 2024 EduVantage. Pagamentos seguros processados por <strong>Mercado Pago</strong>.
+            © 2024 EduVantage. Plataforma de educação com integração de pagamentos segura.
           </div>
         </footer>
       </div>

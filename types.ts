@@ -18,6 +18,7 @@ export interface Course {
   title: string;
   description: string;
   instructor: string;
+  instructorId?: string; // ID do usuário Supabase que criou o curso
   price: number;
   thumbnail: string;
   modules: Module[];

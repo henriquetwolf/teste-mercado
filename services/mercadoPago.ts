@@ -2,9 +2,24 @@
 import { supabase } from './supabase';
 
 /**
- * Busca o Access Token configurado no banco de dados
+ * Busca o Access Token configurado. Se houver um instructorId, busca as chaves dele.
+ * Caso contrário, busca as chaves globais da plataforma.
  */
-const getAccessToken = async () => {
+const getAccessToken = async (instructorId?: string) => {
+  if (instructorId) {
+    // Busca credenciais específicas do professor na tabela profiles ou instructor_settings
+    const { data: instructorData } = await supabase
+      .from('profiles')
+      .select('payment_config')
+      .eq('id', instructorId)
+      .single();
+
+    if (instructorData?.payment_config?.accessToken) {
+      return instructorData.payment_config.accessToken;
+    }
+  }
+
+  // Fallback para configuração global
   const { data: configData } = await supabase
     .from('platform_settings')
     .select('value')
@@ -12,7 +27,7 @@ const getAccessToken = async () => {
     .single();
 
   if (!configData?.value?.accessToken) {
-    throw new Error("Access Token não configurado no painel administrativo.");
+    throw new Error("Meio de pagamento não configurado pelo instrutor nem pela plataforma.");
   }
   return configData.value.accessToken;
 };
@@ -22,9 +37,9 @@ const getAccessToken = async () => {
  */
 export const createPreference = async (course: any, user: any, finalPrice?: number) => {
   try {
-    const accessToken = await getAccessToken();
+    // Usamos o instructorId do curso para determinar qual conta recebe o valor
+    const accessToken = await getAccessToken(course.instructorId);
     
-    // Garantir que o preço seja um número e esteja arredondado para 2 casas decimais
     const rawPrice = finalPrice !== undefined ? finalPrice : course.price;
     const price = Number(Number(rawPrice).toFixed(2));
 
@@ -32,11 +47,7 @@ export const createPreference = async (course: any, user: any, finalPrice?: numb
       throw new Error("Preço inválido para processamento.");
     }
 
-    // Nota: Usamos query params simplificados para o back_url
     const baseUrl = window.location.origin + window.location.pathname + (window.location.pathname.endsWith('/') ? '' : '/') + '#/my-courses';
-
-    // Gerar uma referência externa única para esta tentativa de compra específica
-    // Isso evita que o Mercado Pago recupere uma preferência antiga com preço diferente
     const attemptId = Date.now().toString().slice(-6);
     const externalReference = `${user.id}---${course.id}---${attemptId}`;
 
@@ -60,9 +71,9 @@ export const createPreference = async (course: any, user: any, finalPrice?: numb
           email: user.email,
         },
         back_urls: {
-          success: `${baseUrl}?origin=mercadopago`,
+          success: `${baseUrl}?origin=payment`,
           failure: `${window.location.origin}/#/checkout/${course.id}?payment_status=error`,
-          pending: `${baseUrl}?origin=mercadopago`
+          pending: `${baseUrl}?origin=payment`
         },
         auto_return: 'approved',
         external_reference: externalReference
@@ -71,8 +82,7 @@ export const createPreference = async (course: any, user: any, finalPrice?: numb
 
     if (!response.ok) {
       const errorData = await response.json();
-      console.error("MP API Error Details:", errorData);
-      throw new Error(errorData.message || "Erro ao comunicar com Mercado Pago");
+      throw new Error(errorData.message || "Erro ao comunicar com o gateway de pagamento");
     }
 
     const preference = await response.json();
@@ -83,12 +93,9 @@ export const createPreference = async (course: any, user: any, finalPrice?: numb
   }
 };
 
-/**
- * Consulta a API do Mercado Pago para confirmar se o pagamento foi aprovado
- */
-export const verifyPaymentStatus = async (paymentId: string) => {
+export const verifyPaymentStatus = async (paymentId: string, instructorId?: string) => {
   try {
-    const accessToken = await getAccessToken();
+    const accessToken = await getAccessToken(instructorId);
     
     const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
       method: 'GET',
@@ -97,51 +104,32 @@ export const verifyPaymentStatus = async (paymentId: string) => {
       }
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      return { 
-        approved: false, 
-        error: errorData.message || 'Pagamento não encontrado',
-        status: 'error'
-      };
-    }
+    if (!response.ok) return { approved: false, status: 'not_found' };
 
     const paymentData = await response.json();
-    
     return {
       approved: paymentData.status === 'approved',
       status: paymentData.status,
-      // A referência externa agora tem 3 partes: [userId, courseId, attemptId]
       external_reference: paymentData.external_reference,
       amount: paymentData.transaction_amount,
       id: paymentData.id
     };
   } catch (error) {
-    console.error("Erro na verificação do pagamento:", error);
-    return { approved: false, error: 'Falha na comunicação', status: 'offline' };
+    return { approved: false, status: 'error' };
   }
 };
 
-/**
- * Busca pagamentos recentes para tentar reconciliar compras pendentes
- */
-export const searchPayments = async (limit = 50) => {
+export const searchPayments = async (limit = 50, instructorId?: string) => {
   try {
-    const accessToken = await getAccessToken();
-    
+    const accessToken = await getAccessToken(instructorId);
     const response = await fetch(`https://api.mercadopago.com/v1/payments/search?sort=date_created&criteria=desc&limit=${limit}`, {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-      }
+      headers: { 'Authorization': `Bearer ${accessToken}` }
     });
-
-    if (!response.ok) throw new Error("Não foi possível buscar os pagamentos.");
-
+    if (!response.ok) throw new Error("Erro ao buscar pagamentos.");
     const data = await response.json();
     return data.results || [];
   } catch (error) {
-    console.error("Erro ao buscar pagamentos no MP:", error);
     return [];
   }
 };
