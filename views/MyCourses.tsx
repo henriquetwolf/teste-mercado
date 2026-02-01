@@ -62,7 +62,10 @@ export default function MyCourses() {
         const verification = await verifyPaymentStatus(paymentId);
 
         if (verification.approved && verification.external_reference) {
-          const [userId, courseId] = verification.external_reference.split('---');
+          // Novo formato: userId---courseId---attemptId
+          const parts = verification.external_reference.split('---');
+          const userId = parts[0];
+          const courseId = parts[1];
 
           if (user.id !== userId) {
             throw new Error("Este pagamento pertence a outra conta de usuário.");
@@ -75,7 +78,6 @@ export default function MyCourses() {
         } else if (statusFromMP === 'pending' || statusFromMP === 'in_process') {
           setVerificationError("Seu pagamento está em análise. Assim que aprovado, o curso aparecerá aqui.");
         } else {
-          // Se o gateway disse que deu erro, mas o usuário acha que pagou, damos a opção de sync manual
           setVerificationError(`O status atual do pagamento é: ${verification.status || statusFromMP || 'não identificado'}.`);
         }
       } catch (err: any) {
@@ -105,7 +107,7 @@ export default function MyCourses() {
 
       if (enrollError) throw enrollError;
 
-      // 3. Atualizar venda
+      // 3. Atualizar venda (Tenta dar match por user e course)
       await supabase.from('sales')
         .update({ status: 'Pago', mp_payment_id: paymentId })
         .match({ user_id: userId, course_id: courseId });
@@ -130,7 +132,6 @@ export default function MyCourses() {
     }
   }
 
-  // Função para sincronizar pagamentos que podem ter falhado no retorno automático
   async function syncPurchases() {
     setSyncing(true);
     setVerificationError(null);
@@ -145,9 +146,10 @@ export default function MyCourses() {
 
       for (const payment of mpPayments) {
         if (payment.status === 'approved' && payment.external_reference) {
-          const [userId, courseId] = payment.external_reference.split('---');
+          const parts = payment.external_reference.split('---');
+          const userId = parts[0];
+          const courseId = parts[1];
           
-          // Verifica se o pagamento é deste usuário e se ele ainda não tem o curso
           if (userId === user.id && !purchasedIds.includes(courseId)) {
             await enrollUser(userId, courseId, payment.id.toString());
             enrolledCount++;

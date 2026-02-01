@@ -23,10 +23,22 @@ const getAccessToken = async () => {
 export const createPreference = async (course: any, user: any, finalPrice?: number) => {
   try {
     const accessToken = await getAccessToken();
-    const price = finalPrice !== undefined ? finalPrice : course.price;
+    
+    // Garantir que o preço seja um número e esteja arredondado para 2 casas decimais
+    const rawPrice = finalPrice !== undefined ? finalPrice : course.price;
+    const price = Number(Number(rawPrice).toFixed(2));
+
+    if (isNaN(price) || price <= 0) {
+      throw new Error("Preço inválido para processamento.");
+    }
 
     // Nota: Usamos query params simplificados para o back_url
     const baseUrl = window.location.origin + window.location.pathname + (window.location.pathname.endsWith('/') ? '' : '/') + '#/my-courses';
+
+    // Gerar uma referência externa única para esta tentativa de compra específica
+    // Isso evita que o Mercado Pago recupere uma preferência antiga com preço diferente
+    const attemptId = Date.now().toString().slice(-6);
+    const externalReference = `${user.id}---${course.id}---${attemptId}`;
 
     const response = await fetch('https://api.mercadopago.com/checkout/preferences', {
       method: 'POST',
@@ -37,7 +49,7 @@ export const createPreference = async (course: any, user: any, finalPrice?: numb
       body: JSON.stringify({
         items: [
           {
-            id: course.id,
+            id: course.id.toString(),
             title: course.title,
             unit_price: price,
             quantity: 1,
@@ -53,13 +65,14 @@ export const createPreference = async (course: any, user: any, finalPrice?: numb
           pending: `${baseUrl}?origin=mercadopago`
         },
         auto_return: 'approved',
-        external_reference: `${user.id}---${course.id}`
+        external_reference: externalReference
       })
     });
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.message || "Erro ao criar preferência no Mercado Pago");
+      console.error("MP API Error Details:", errorData);
+      throw new Error(errorData.message || "Erro ao comunicar com Mercado Pago");
     }
 
     const preference = await response.json();
@@ -88,7 +101,7 @@ export const verifyPaymentStatus = async (paymentId: string) => {
       const errorData = await response.json();
       return { 
         approved: false, 
-        error: errorData.message || 'Pagamento não encontrado na API do Mercado Pago',
+        error: errorData.message || 'Pagamento não encontrado',
         status: 'error'
       };
     }
@@ -98,13 +111,14 @@ export const verifyPaymentStatus = async (paymentId: string) => {
     return {
       approved: paymentData.status === 'approved',
       status: paymentData.status,
+      // A referência externa agora tem 3 partes: [userId, courseId, attemptId]
       external_reference: paymentData.external_reference,
       amount: paymentData.transaction_amount,
       id: paymentData.id
     };
   } catch (error) {
     console.error("Erro na verificação do pagamento:", error);
-    return { approved: false, error: 'Falha na comunicação com o gateway', status: 'offline' };
+    return { approved: false, error: 'Falha na comunicação', status: 'offline' };
   }
 };
 
