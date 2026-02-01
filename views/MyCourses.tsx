@@ -21,25 +21,32 @@ export default function MyCourses() {
 
   async function checkPaymentReturn() {
     const params = new URLSearchParams(location.search);
-    const paymentId = params.get('payment_id');
-    const statusFromUrl = params.get('status');
+    
+    // O Mercado Pago pode enviar como payment_id ou collection_id dependendo da versão
+    const paymentId = params.get('payment_id') || params.get('collection_id');
+    const statusFromMP = params.get('status') || params.get('collection_status');
+
+    console.log("Verificando retorno de pagamento:", { paymentId, statusFromMP });
 
     // Só inicia a verificação se houver um ID de pagamento na URL
-    if (paymentId && (statusFromUrl === 'success' || statusFromUrl === 'approved')) {
+    if (paymentId) {
       setVerifyingPayment(true);
       setVerificationError(null);
       
       try {
-        // ETAPA DE SEGURANÇA: Consultar o Mercado Pago diretamente
+        // ETAPA DE SEGURANÇA: Consultar o Mercado Pago diretamente via API Server-side (simulada pelo fetch no service)
         const verification = await verifyPaymentStatus(paymentId);
 
         if (verification.approved && verification.external_reference) {
           const [userId, courseId] = verification.external_reference.split('---');
 
           // Validar se o usuário logado é o mesmo que pagou (segurança extra)
-          const { data: { session } } = await supabase.auth.getSession();
+          const { data: sessionData } = await supabase.auth.getSession();
+          const session = sessionData.session;
+          
           if (session?.user.id !== userId) {
-            throw new Error("Este pagamento pertence a outra conta.");
+            console.error("Divergência de usuário:", { sessionUserId: session?.user.id, paymentUserId: userId });
+            throw new Error("Este pagamento pertence a outra conta de usuário.");
           }
 
           // 1. Verificar se já está matriculado
@@ -51,27 +58,34 @@ export default function MyCourses() {
             .maybeSingle();
 
           if (!existing) {
-            // 2. Liberar o curso no banco de dados
-            await supabase.from('enrollments').insert({
+            console.log("Criando nova matrícula para o curso:", courseId);
+            // 2. Liberar o curso no banco de dados (Tabela enrollments)
+            const { error: enrollError } = await supabase.from('enrollments').insert({
               user_id: userId,
               course_id: courseId
             });
 
-            // 3. Atualizar log de vendas
+            if (enrollError) throw enrollError;
+
+            // 3. Atualizar log de vendas para 'Pago'
             await supabase.from('sales')
               .update({ status: 'Pago', mp_payment_id: paymentId })
-              .eq('mp_preference_id', params.get('preference_id'));
+              .eq('mp_preference_id', params.get('preference_id') || params.get('merchant_order_id'));
+            
+            console.log("Curso liberado com sucesso!");
           }
 
-          // Sucesso total: Limpa a URL e recarrega a lista
+          // Limpa os parâmetros da URL para evitar re-processamento em refresh
           navigate('/my-courses', { replace: true });
           await fetchMyEnrollments();
+        } else if (statusFromMP === 'pending' || statusFromMP === 'in_process') {
+          setVerificationError("Seu pagamento está sendo processado pelo Mercado Pago. O curso será liberado assim que for aprovado.");
         } else {
-          setVerificationError(`O pagamento ainda não foi aprovado (Status: ${verification.status || 'Pendente'}).`);
+          setVerificationError(`O pagamento não pôde ser confirmado como aprovado. Status: ${verification.status || statusFromMP || 'Desconhecido'}`);
         }
       } catch (err: any) {
-        console.error("Erro na liberação:", err);
-        setVerificationError(err.message || "Não foi possível validar seu pagamento.");
+        console.error("Erro detalhado na liberação:", err);
+        setVerificationError(err.message || "Não foi possível validar seu pagamento. Entre em contato com o suporte.");
       } finally {
         setVerifyingPayment(false);
       }
@@ -81,7 +95,8 @@ export default function MyCourses() {
   async function fetchMyEnrollments() {
     setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: sessionData } = await supabase.auth.getSession();
+      const session = sessionData.session;
       if (!session) return;
 
       const { data, error } = await supabase
@@ -90,7 +105,9 @@ export default function MyCourses() {
         .eq('user_id', session.user.id);
 
       if (error) throw error;
-      if (data) setPurchasedIds(data.map(item => item.course_id));
+      if (data) {
+        setPurchasedIds(data.map(item => item.course_id));
+      }
     } catch (err) {
       console.error("Erro ao buscar matrículas:", err);
     } finally {
@@ -102,12 +119,16 @@ export default function MyCourses() {
   
   useEffect(() => {
     async function fetchAllCourses() {
-      const { data } = await supabase.from('courses').select('*');
-      if (data) {
-        setAllAvailableCourses(prev => {
-          const combined = [...data, ...prev.filter(p => !data.find(d => d.id === p.id))];
-          return combined;
-        });
+      try {
+        const { data } = await supabase.from('courses').select('*');
+        if (data && data.length > 0) {
+          setAllAvailableCourses(prev => {
+            const combined = [...data, ...prev.filter(p => !data.find(d => d.id === p.id))];
+            return combined;
+          });
+        }
+      } catch (e) {
+        console.error("Erro ao carregar lista de cursos:", e);
       }
     }
     fetchAllCourses();
@@ -124,9 +145,13 @@ export default function MyCourses() {
              <ShieldCheck className="text-sky-600" size={32} />
           </div>
         </div>
-        <h2 className="text-xl font-black text-slate-900 mb-2">Validando Transação</h2>
+        <h2 className="text-xl font-black text-slate-900 mb-2">
+          {verifyingPayment ? 'Confirmando Pagamento...' : 'Carregando sua biblioteca...'}
+        </h2>
         <p className="text-slate-500 text-center max-w-xs text-sm">
-          Estamos confirmando a autenticidade do seu pagamento junto ao Mercado Pago. Isso leva apenas alguns segundos.
+          {verifyingPayment 
+            ? 'Estamos verificando com o Mercado Pago para liberar seu acesso instantaneamente.' 
+            : 'Organizando seus cursos adquiridos.'}
         </p>
       </div>
     );
@@ -136,15 +161,15 @@ export default function MyCourses() {
     <div className="min-h-screen bg-slate-50 pb-20">
       {verificationError && (
         <div className="max-w-7xl mx-auto px-4 pt-8">
-          <div className="bg-rose-50 border border-rose-100 p-6 rounded-[24px] flex items-center gap-4 text-rose-700 animate-fade-in">
+          <div className="bg-amber-50 border border-amber-100 p-6 rounded-[24px] flex items-center gap-4 text-amber-800 animate-fade-in">
              <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm shrink-0">
-               <ShieldAlert className="text-rose-500" />
+               <ShieldAlert className="text-amber-500" />
              </div>
              <div>
-               <h4 className="font-black text-sm uppercase tracking-tight">Falha na Liberação Automática</h4>
-               <p className="text-xs opacity-80">{verificationError} Se você já pagou, o curso será liberado em instantes.</p>
+               <h4 className="font-black text-sm uppercase tracking-tight">Status do Pagamento</h4>
+               <p className="text-xs opacity-80">{verificationError}</p>
              </div>
-             <button onClick={() => setVerificationError(null)} className="ml-auto text-rose-400 hover:text-rose-600 font-bold text-xs">Fechar</button>
+             <button onClick={() => setVerificationError(null)} className="ml-auto text-amber-400 hover:text-amber-600 font-bold text-xs">Ocultar</button>
           </div>
         </div>
       )}
@@ -169,7 +194,7 @@ export default function MyCourses() {
               <BookOpen className="text-slate-200" size={48} />
             </div>
             <h2 className="text-3xl font-black text-slate-900 mb-4">Nenhum curso por aqui</h2>
-            <p className="text-slate-500 mb-10 max-w-sm mx-auto">Após a confirmação do pagamento, seus treinamentos aparecerão automaticamente nesta área.</p>
+            <p className="text-slate-500 mb-10 max-w-sm mx-auto">Após a confirmação do pagamento pelo gateway, seus treinamentos aparecerão automaticamente nesta área.</p>
             <Link to="/" className="bg-sky-600 text-white px-10 py-4 rounded-2xl font-black hover:bg-sky-700 transition-all inline-flex items-center gap-2 shadow-xl">
               Ver Cursos Disponíveis <Sparkles size={18} />
             </Link>
