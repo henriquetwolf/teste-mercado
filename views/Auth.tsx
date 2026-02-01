@@ -1,8 +1,15 @@
 
 import React, { useState } from 'react';
 import { supabase } from '../services/supabase';
-import { GraduationCap, Mail, Lock, ArrowRight, Loader2, Github, Chrome, ShieldAlert, AlertCircle, Info, ExternalLink, UserPlus, Users, Briefcase } from 'lucide-react';
+import { GraduationCap, Mail, Lock, ArrowRight, Loader2, ShieldAlert, Info, ExternalLink, UserPlus, Users, Briefcase } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+
+const Sparkles = ({ size }: { size: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+    <path d="M5 3v4"/><path d="M3 5h4"/><path d="M21 17v4"/><path d="M19 19h4"/>
+  </svg>
+);
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -54,7 +61,7 @@ export default function Auth() {
           options: {
             data: {
               full_name: email.split('@')[0],
-              role: role // 'student' ou 'instructor'
+              role: role
             }
           }
         });
@@ -149,7 +156,7 @@ export default function Auth() {
             )}
 
             {error && (
-              <div className={`p-4 rounded-xl animate-shake border ${
+              <div className={`p-4 rounded-xl border ${
                 error.type === 'warning' ? 'bg-amber-50 border-amber-100 text-amber-700' : 
                 error.type === 'critical' ? 'bg-indigo-50 border-indigo-100 text-indigo-700' :
                 error.type === 'auth_fail' ? 'bg-rose-50 border-rose-100 text-rose-700' :
@@ -231,22 +238,8 @@ export default function Auth() {
               )}
             </button>
           </form>
-
-          {email === 'wolf@wolf.com' && isLogin && (
-            <div className="mt-6 p-3 bg-indigo-50 border border-indigo-100 rounded-lg text-indigo-600 text-[10px] font-black uppercase text-center flex items-center justify-center gap-2">
-              <AlertCircle size={14} />
-              Modo Admin Sugerido
-            </div>
-          )}
         </div>
       </div>
     </div>
   );
 }
-
-const Sparkles = ({ size }: { size: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
-    <path d="M5 3v4"/><path d="M3 5h4"/><path d="M21 17v4"/><path d="M19 19h4"/>
-  </svg>
-);

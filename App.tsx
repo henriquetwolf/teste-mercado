@@ -1,31 +1,26 @@
 
 import React, { useState, useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import { 
   GraduationCap, 
-  ShoppingCart, 
   LogOut, 
   Loader2, 
   Shield, 
-  Presentation, 
-  Layout, 
-  Search,
-  BookOpen,
-  Settings
+  Presentation
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from './services/supabase';
-import Home from './views/Home.tsx';
-import CourseDetails from './views/CourseDetails.tsx';
-import Classroom from './views/Classroom.tsx';
-import Checkout from './views/Checkout.tsx';
-import MyCourses from './views/MyCourses.tsx';
-import Admin from './views/Admin.tsx';
-import Auth from './views/Auth.tsx';
-import InstructorDashboard from './views/InstructorDashboard.tsx';
+import Home from './views/Home';
+import CourseDetails from './views/CourseDetails';
+import Classroom from './views/Classroom';
+import Checkout from './views/Checkout';
+import MyCourses from './views/MyCourses';
+import Admin from './views/Admin';
+import Auth from './views/Auth';
+import InstructorDashboard from './views/InstructorDashboard';
 
 const ADMIN_EMAIL = 'wolf@wolf.com';
 
-const Header = ({ cartCount, user }: { cartCount: number, user: any }) => {
+const Header = ({ user }: { user: any }) => {
   const handleLogout = () => supabase.auth.signOut();
   const isAdmin = user?.email === ADMIN_EMAIL;
 
@@ -120,7 +115,7 @@ export default function App() {
   return (
     <Router>
       <div className="min-h-screen flex flex-col bg-slate-50 font-['Inter']">
-        <Header cartCount={0} user={user} />
+        <Header user={user} />
         <main className="flex-grow">
           <Routes>
             <Route path="/" element={<Home />} />

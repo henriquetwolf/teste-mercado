@@ -6,22 +6,38 @@ import {
   BookOpen, 
   DollarSign, 
   Plus, 
-  Settings, 
   Users, 
   Loader2, 
-  Video, 
-  Trash2, 
-  Edit, 
   Save, 
-  X,
   CreditCard,
-  Key,
   TrendingUp,
-  ExternalLink,
-  Target,
   Zap,
   Info
 } from 'lucide-react';
+
+const SidebarBtn = ({ active, onClick, icon, label }: any) => (
+  <button 
+    onClick={onClick} 
+    className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-bold text-sm transition-all ${active ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+  >
+    {icon} {label}
+  </button>
+);
+
+const StatCard = ({ label, value, icon, trend }: any) => (
+  <div className="bg-white p-10 rounded-[40px] border border-slate-200 shadow-sm relative overflow-hidden group hover:border-indigo-200 transition-all">
+    <div className="relative z-10 space-y-6">
+      <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center group-hover:bg-indigo-50 transition-colors">
+        {icon}
+      </div>
+      <div>
+        <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">{label}</p>
+        <h4 className="text-4xl font-black text-slate-900 tracking-tight">{value}</h4>
+      </div>
+      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter bg-slate-50 inline-block px-2 py-1 rounded-lg">{trend}</p>
+    </div>
+  </div>
+);
 
 export default function InstructorDashboard() {
   const [activeTab, setActiveTab] = useState<'overview' | 'courses' | 'marketplace'>('overview');
@@ -31,7 +47,6 @@ export default function InstructorDashboard() {
   const [isSaving, setIsSaving] = useState(false);
 
   const [stats, setStats] = useState({ totalRevenue: 0, totalStudents: 0, activeCourses: 0 });
-  const [editingCourse, setEditingCourse] = useState<any>(null);
 
   const [paymentConfig, setPaymentConfig] = useState({
     gateway: 'mercadopago',
@@ -47,7 +62,8 @@ export default function InstructorDashboard() {
 
   async function loadInstructorData() {
     setLoading(true);
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data } = await supabase.auth.getSession();
+    const session = data?.session;
     if (!session) return;
     setUser(session.user);
 
@@ -90,6 +106,7 @@ export default function InstructorDashboard() {
   }
 
   const handleSavePaymentConfig = async () => {
+    if (!user) return;
     setIsSaving(true);
     try {
       const { error } = await supabase
@@ -133,7 +150,7 @@ export default function InstructorDashboard() {
              <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Taxa de Marketplace</p>
              <div className="flex items-center gap-2">
                 <span className="text-2xl font-black italic">1.0%</span>
-                <span className="text-[9px] text-slate-500 font-bold uppercase leading-tight">Retidos pela<br/>plataforma</span>
+                <span className="text-[9px] text-slate-500 font-bold uppercase leading-tight">Retidos pela plataforma</span>
              </div>
           </div>
         </div>
@@ -202,7 +219,7 @@ export default function InstructorDashboard() {
                         className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-mono text-xs focus:ring-4 focus:ring-indigo-50 outline-none" 
                         placeholder="APP_USR-..." 
                       />
-                      <p className="mt-2 text-[9px] text-slate-400 font-bold uppercase">Obtenha suas chaves em: Painel Mercado Pago > Suas integrações</p>
+                      <p className="mt-2 text-[9px] text-slate-400 font-bold uppercase">Obtenha suas chaves em: Painel Mercado Pago &gt; Suas integrações</p>
                   </div>
                </div>
 
@@ -236,7 +253,7 @@ export default function InstructorDashboard() {
                   courses.map(course => (
                     <div key={course.id} className="bg-white rounded-[40px] border border-slate-200 overflow-hidden group hover:shadow-2xl transition-all">
                        <div className="aspect-video relative overflow-hidden">
-                          <img src={course.thumbnail} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                          <img src={course.thumbnail} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={course.title} />
                           <div className="absolute top-4 right-4 bg-indigo-600 text-white text-[9px] font-black px-2 py-1 rounded-lg uppercase">Online</div>
                        </div>
                        <div className="p-8">
@@ -256,27 +273,3 @@ export default function InstructorDashboard() {
     </div>
   );
 }
-
-const SidebarBtn = ({ active, onClick, icon, label }: any) => (
-  <button 
-    onClick={onClick} 
-    className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-bold text-sm transition-all ${active ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
-  >
-    {icon} {label}
-  </button>
-);
-
-const StatCard = ({ label, value, icon, trend }: any) => (
-  <div className="bg-white p-10 rounded-[40px] border border-slate-200 shadow-sm relative overflow-hidden group hover:border-indigo-200 transition-all">
-    <div className="relative z-10 space-y-6">
-      <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center group-hover:bg-indigo-50 transition-colors">
-        {icon}
-      </div>
-      <div>
-        <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">{label}</p>
-        <h4 className="text-4xl font-black text-slate-900 tracking-tight">{value}</h4>
-      </div>
-      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter bg-slate-50 inline-block px-2 py-1 rounded-lg">{trend}</p>
-    </div>
-  </div>
-);
