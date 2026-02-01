@@ -8,6 +8,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
+    <!-- Mercado Pago SDK -->
+    <script src="https://sdk.mercadopago.com/js/v2"></script>
+
     <script>
       window.process = { env: { API_KEY: "" } };
       window.onerror = function(msg, url, lineNo, columnNo, error) {
@@ -48,7 +51,7 @@
       <div class="h-screen flex items-center justify-center text-center p-6">
         <div class="animate-pulse flex flex-col items-center gap-4">
           <div class="w-12 h-12 border-4 border-sky-600 border-t-transparent rounded-full animate-spin"></div>
-          <p class="text-slate-400 font-medium">Iniciando plataforma Mercado Pago...</p>
+          <p class="text-slate-400 font-medium">Conectando ao gateway Mercado Pago...</p>
         </div>
       </div>
     </div>
