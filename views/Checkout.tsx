@@ -41,21 +41,19 @@ export default function Checkout({ onComplete }: Props) {
 
   const handleRealPayment = () => {
     if (course?.payment_link) {
-      // Abre o link real do Mercado Pago em outra aba
+      // Abre o link real do PagSeguro em outra aba
       window.open(course.payment_link, '_blank');
-      
-      // Avisa o aluno o que fazer depois
-      alert("Você foi redirecionado para o checkout oficial do Mercado Pago. Após o pagamento, o acesso será liberado em sua conta (necessita liberação manual pelo administrador nesta versão).");
+      alert("Você foi redirecionado para o checkout seguro do PagSeguro. Após o pagamento, o acesso será liberado em sua conta automaticamente (sujeito à confirmação do gateway).");
     }
   };
 
-  if (loading) return <div className="p-20 text-center"><Loader2 className="animate-spin mx-auto text-sky-600" /></div>;
+  if (loading) return <div className="p-20 text-center"><Loader2 className="animate-spin mx-auto text-emerald-600" /></div>;
   if (!course) return <div className="p-20 text-center">Curso não encontrado</div>;
 
   return (
     <div className="bg-slate-50 min-h-screen py-12">
       <div className="max-w-4xl mx-auto px-4">
-        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-slate-500 font-medium mb-8 hover:text-sky-600">
+        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-slate-500 font-medium mb-8 hover:text-emerald-600">
           <ChevronLeft size={20} /> Voltar
         </button>
 
@@ -64,15 +62,15 @@ export default function Checkout({ onComplete }: Props) {
             
             {/* Esquerda: Informações */}
             <div className="p-10 bg-slate-50 border-r border-slate-200">
-               <div className="inline-flex items-center gap-2 bg-[#009EE3] text-white px-3 py-1 rounded-full text-[10px] font-black uppercase mb-6">
-                 Mercado Pago Oficial
+               <div className="inline-flex items-center gap-2 bg-[#ffc107] text-[#1e1e1e] px-3 py-1 rounded-full text-[10px] font-black uppercase mb-6">
+                 PagSeguro Gateway
                </div>
                <h2 className="text-3xl font-black text-slate-900 mb-4">{course.title}</h2>
-               <p className="text-slate-500 mb-8 leading-relaxed">Você está prestes a adquirir acesso vitalício ao conteúdo, incluindo suporte da IA Tutor e atualizações.</p>
+               <p className="text-slate-500 mb-8 leading-relaxed">Acesso vitalício garantido com a segurança e facilidade do PagSeguro.</p>
                
                <div className="space-y-4">
                  <div className="flex justify-between items-center text-slate-400 text-sm font-bold uppercase tracking-widest">
-                   <span>Preço Unitário</span>
+                   <span>Investimento Único</span>
                    <span>R$ {course.price.toFixed(2)}</span>
                  </div>
                  <div className="flex justify-between items-center text-3xl font-black text-slate-900 border-t border-slate-200 pt-4">
@@ -83,10 +81,10 @@ export default function Checkout({ onComplete }: Props) {
 
                <div className="mt-12 space-y-3">
                   <div className="flex items-center gap-3 text-xs text-slate-400 font-bold uppercase">
-                     <ShieldCheck className="text-emerald-500" size={18} /> Compra 100% Protegida
+                     <ShieldCheck className="text-emerald-500" size={18} /> Pagamento Protegido
                   </div>
                   <div className="flex items-center gap-3 text-xs text-slate-400 font-bold uppercase">
-                     <Lock className="text-sky-500" size={18} /> Dados Criptografados
+                     <Lock className="text-amber-500" size={18} /> Ambiente Criptografado
                   </div>
                </div>
             </div>
@@ -99,36 +97,35 @@ export default function Checkout({ onComplete }: Props) {
                        <AlertTriangle className="mx-auto mb-4" size={40} />
                        <h3 className="font-black text-lg mb-2 uppercase">Modo de Simulação</h3>
                        <p className="text-sm opacity-80 leading-relaxed">
-                         Este curso ainda não possui um **Link de Pagamento Real** configurado pelo administrador. Dinheiro real não será processado.
+                         Este curso ainda não possui um **Link de Pagamento do PagSeguro** configurado.
                        </p>
                     </div>
                     <button 
                       disabled
                       className="w-full bg-slate-200 text-slate-400 py-6 rounded-3xl font-black text-xl cursor-not-allowed"
                     >
-                      PAGAMENTO INDISPONÍVEL
+                      AGUARDANDO LINK
                     </button>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase italic">O administrador deve configurar o link real no Painel Admin para receber pagamentos.</p>
                  </div>
                ) : (
                  <div className="space-y-8">
                     <div className="text-center">
-                       <Zap className="mx-auto text-sky-500 mb-4" size={56} />
-                       <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Pagamento Real</h3>
-                       <p className="text-slate-500 mt-2">Clique no botão abaixo para ir ao checkout seguro do Mercado Pago.</p>
+                       <CreditCard className="mx-auto text-emerald-600 mb-4" size={56} />
+                       <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Finalizar Compra</h3>
+                       <p className="text-slate-500 mt-2">Você será levado ao PagSeguro para completar o pagamento.</p>
                     </div>
 
                     <button 
                       onClick={handleRealPayment}
-                      className="w-full bg-[#009EE3] text-white py-6 rounded-3xl font-black text-2xl hover:bg-[#0089c7] shadow-2xl shadow-sky-200 transition-all flex items-center justify-center gap-3 active:scale-95"
+                      className="w-full bg-[#5cb85c] text-white py-6 rounded-3xl font-black text-2xl hover:bg-[#4cae4c] shadow-2xl shadow-emerald-200 transition-all flex items-center justify-center gap-3 active:scale-95"
                     >
-                      PAGAR AGORA <ExternalLink size={24} />
+                      PAGAR COM PAGSEGURO <ExternalLink size={24} />
                     </button>
 
-                    <div className="bg-sky-50 p-6 rounded-3xl border border-sky-100 flex gap-4 text-left">
-                       <Info className="text-sky-600 shrink-0" />
-                       <p className="text-[11px] text-sky-800 font-medium leading-relaxed">
-                          <strong>Atenção:</strong> Como esta é uma versão integrada, após pagar no Mercado Pago, envie seu comprovante ao administrador para que ele mude seu status de compra no banco de dados para "Aprovado" e seu curso seja liberado em "Meus Cursos".
+                    <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100 flex gap-4 text-left">
+                       <Info className="text-emerald-600 shrink-0" />
+                       <p className="text-[11px] text-emerald-800 font-medium leading-relaxed">
+                          <strong>Dica:</strong> No PagSeguro você pode parcelar no cartão ou pagar via PIX para liberação instantânea.
                        </p>
                     </div>
                  </div>

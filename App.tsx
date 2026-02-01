@@ -22,26 +22,26 @@ const Header = ({ cartCount, user }: { cartCount: number, user: any }) => {
     <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          <Link to="/" className="flex items-center gap-2 text-sky-600 font-bold text-xl">
+          <Link to="/" className="flex items-center gap-2 text-emerald-600 font-bold text-xl">
             < GraduationCap className="w-8 h-8" />
             <span>EduVantage</span>
           </Link>
 
           <div className="flex items-center gap-4 md:gap-8 text-slate-600 font-medium">
-            <Link to="/" className="hidden md:block hover:text-sky-600 transition-colors">Explorar</Link>
+            <Link to="/" className="hidden md:block hover:text-emerald-600 transition-colors">Explorar</Link>
             
             <div className="flex items-center gap-4">
               {user ? (
                 <>
-                  <Link to="/my-courses" className="hover:text-sky-600 transition-colors">Meus Cursos</Link>
+                  <Link to="/my-courses" className="hover:text-emerald-600 transition-colors">Meus Cursos</Link>
                   <div className="relative">
                     <ShoppingCart className="w-6 h-6 text-slate-400" />
-                    {cartCount > 0 && <span className="absolute -top-2 -right-2 bg-sky-600 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">{cartCount}</span>}
+                    {cartCount > 0 && <span className="absolute -top-2 -right-2 bg-emerald-600 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">{cartCount}</span>}
                   </div>
                   <div className="flex items-center gap-3 border-l pl-6 border-slate-200">
                     {isAdmin && (
                       <Link to="/admin" className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-slate-800 transition-all shadow-sm">
-                        <Shield size={14} className="text-sky-400" />
+                        <Shield size={14} className="text-emerald-400" />
                         Painel Admin
                       </Link>
                     )}
@@ -51,7 +51,7 @@ const Header = ({ cartCount, user }: { cartCount: number, user: any }) => {
                   </div>
                 </>
               ) : (
-                <Link to="/auth" className="bg-sky-600 text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all">
+                <Link to="/auth" className="bg-emerald-600 text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all">
                   Entrar
                 </Link>
               )}
@@ -71,7 +71,7 @@ const MissingConfig = () => (
       </div>
       <h1 className="text-2xl font-bold text-slate-900 mb-4">Conexão Necessária</h1>
       <p className="text-slate-600 mb-8 leading-relaxed">
-        As chaves do <strong>Supabase</strong> não foram encontradas ou são inválidas no seu arquivo de serviço.
+        As chaves do <strong>Supabase</strong> não foram encontradas ou são inválidas.
       </p>
       <a 
         href="https://supabase.com/dashboard" 
@@ -117,32 +117,26 @@ export default function App() {
   if (initializing) {
     return (
       <div className="h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="animate-spin text-sky-600" size={40} />
+        <Loader2 className="animate-spin text-emerald-600" size={40} />
       </div>
     );
   }
 
   const onPurchaseComplete = async (courseId: string) => {
     if (!user) return;
-    
-    // Tenta encontrar o curso em COURSES ou buscar no DB se necessário para o preço
     const course = COURSES.find(c => c.id === courseId);
-    
     try {
-      const { error: saleErr } = await supabase.from('sales').insert({
+      await supabase.from('sales').insert({
         user_id: user.id,
         course_id: courseId,
         amount: course?.price || 0,
         status: 'Aprovado',
-        payment_method: 'Mercado Pago'
+        payment_method: 'PagSeguro'
       });
-
-      const { error: enrollErr } = await supabase.from('enrollments').insert({
+      await supabase.from('enrollments').insert({
         user_id: user.id,
         course_id: courseId
       });
-
-      if (saleErr || enrollErr) throw new Error("Database insertion failed");
     } catch (err) {
       console.error("Purchase registration error:", err);
     }
@@ -154,24 +148,20 @@ export default function App() {
     <Router>
       <div className="min-h-screen flex flex-col bg-slate-50">
         <Header cartCount={cart.length} user={user} />
-        
         <main className="flex-grow">
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/course/:id" element={<CourseDetails onAddToCart={(id) => !cart.includes(id) && setCart([...cart, id])} />} />
-            
-            {/* Protected Routes */}
             <Route path="/classroom/:courseId" element={user ? <Classroom /> : <Navigate to="/auth" />} />
             <Route path="/checkout/:courseId" element={user ? <Checkout onComplete={onPurchaseComplete} /> : <Navigate to="/auth" />} />
             <Route path="/my-courses" element={user ? <MyCourses /> : <Navigate to="/auth" />} />
             <Route path="/admin" element={isAdmin ? <Admin /> : <Navigate to="/" />} />
           </Routes>
         </main>
-
         <footer className="bg-slate-900 text-slate-400 py-12">
           <div className="max-w-7xl mx-auto px-4 text-center text-sm">
-            © 2024 EduVantage. Pagamentos processados por Mercado Pago. Admin: {ADMIN_EMAIL}
+            © 2024 EduVantage. Pagamentos processados com segurança por PagSeguro. Admin: {ADMIN_EMAIL}
           </div>
         </footer>
       </div>
