@@ -3,12 +3,10 @@ import { GoogleGenAI } from "@google/genai";
 
 export const askAITutor = async (question: string, context: string) => {
   try {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-      return "O Tutor de IA não está configurado (API_KEY ausente).";
-    }
-
-    const ai = new GoogleGenAI({ apiKey });
+    // Correct initialization: always use new GoogleGenAI({apiKey: process.env.API_KEY})
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
+    // Using gemini-3-flash-preview for basic Q&A task as recommended
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Você é um tutor de IA especializado chamado EduBot dentro de uma plataforma de cursos. 
@@ -19,6 +17,7 @@ export const askAITutor = async (question: string, context: string) => {
       Pergunta do aluno: ${question}`,
     });
 
+    // Access the .text property directly (not as a function)
     return response.text || "Desculpe, não consegui processar sua dúvida agora.";
   } catch (error) {
     console.error("Gemini Error:", error);
