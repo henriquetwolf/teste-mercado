@@ -2,7 +2,7 @@
 import { supabase } from './supabase';
 
 /**
- * Busca o Access Token do Admin Master (Fallback ou para configurações globais)
+ * Busca a configuração Master do Admin
  */
 const getAdminConfig = async () => {
   const { data } = await supabase
@@ -30,7 +30,6 @@ const getInstructorAccessToken = async (instructorId?: string) => {
 
 /**
  * Cria a preferência de pagamento com Split de 1% (Marketplace Fee)
- * Se o curso tem um instructor_id, usa o token dele.
  */
 export const createPreference = async (course: any, user: any, finalPrice?: number) => {
   try {
@@ -38,7 +37,7 @@ export const createPreference = async (course: any, user: any, finalPrice?: numb
     const instructorId = course.instructor_id || course.instructorId;
     const instructorToken = await getInstructorAccessToken(instructorId);
     
-    // Prioriza o token do professor, senão usa o do admin
+    // O Access Token deve ser o do PROFESSOR para que ele receba
     const accessToken = instructorToken || adminConfig.accessToken;
     
     if (!accessToken) {
@@ -48,14 +47,15 @@ export const createPreference = async (course: any, user: any, finalPrice?: numb
     const rawPrice = finalPrice !== undefined ? finalPrice : course.price;
     const price = Number(Number(rawPrice).toFixed(2));
     
-    // Cálculo da comissão de 1% para o Admin Master
-    const platformCommission = Number((price * 0.01).toFixed(2));
+    // Taxa de 1% que vai para o dono da aplicação (Admin Master)
+    // Nota: O Mercado Pago exige que o token seja de uma aplicação Marketplace para o fee funcionar.
+    const platformFee = Number((price * 0.01).toFixed(2));
 
     const baseUrl = window.location.origin + window.location.pathname + (window.location.pathname.endsWith('/') ? '' : '/') + '#/my-courses';
     const attemptId = Date.now().toString().slice(-6);
     const externalReference = `${user.id}---${course.id}---${attemptId}`;
 
-    const preferenceBody: any = {
+    const preferenceBody = {
       items: [
         {
           id: course.id.toString(),
@@ -75,8 +75,8 @@ export const createPreference = async (course: any, user: any, finalPrice?: numb
       },
       auto_return: 'approved',
       external_reference: externalReference,
-      // Esta taxa é enviada para a conta da aplicação vinculada ao token (Marketplace)
-      marketplace_fee: platformCommission, 
+      // marketplace_fee envia 1% para a conta master associada ao token da aplicação
+      marketplace_fee: platformFee, 
       statement_descriptor: "EDUVANTAGE"
     };
 
@@ -91,7 +91,7 @@ export const createPreference = async (course: any, user: any, finalPrice?: numb
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.message || "Erro ao gerar checkout");
+      throw new Error(errorData.message || "Erro ao gerar checkout do Mercado Pago");
     }
 
     const preference = await response.json();
