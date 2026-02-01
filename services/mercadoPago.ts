@@ -34,10 +34,9 @@ const getInstructorAccessToken = async (instructorId?: string) => {
 export const createPreference = async (course: any, user: any, finalPrice?: number) => {
   try {
     const adminConfig = await getAdminConfig();
-    const instructorToken = await getInstructorAccessToken(course.instructorId);
+    // Ajuste para instructor_id vindo do banco ou instructorId vindo de constantes legadas
+    const instructorToken = await getInstructorAccessToken(course.instructor_id || course.instructorId);
     
-    // Se o professor não tem token, usamos o do admin (venda direta da plataforma)
-    // Se tem, usamos o dele mas aplicamos a taxa de 1%
     const accessToken = instructorToken || adminConfig.accessToken;
     
     if (!accessToken) {
@@ -46,8 +45,6 @@ export const createPreference = async (course: any, user: any, finalPrice?: numb
 
     const rawPrice = finalPrice !== undefined ? finalPrice : course.price;
     const price = Number(Number(rawPrice).toFixed(2));
-    
-    // CÁLCULO DA COMISSÃO (1%)
     const platformCommission = Number((price * 0.01).toFixed(2));
 
     const baseUrl = window.location.origin + window.location.pathname + (window.location.pathname.endsWith('/') ? '' : '/') + '#/my-courses';
@@ -74,7 +71,6 @@ export const createPreference = async (course: any, user: any, finalPrice?: numb
       },
       auto_return: 'approved',
       external_reference: externalReference,
-      // Aqui o Mercado Pago desconta o valor e envia para a conta da aplicação (Admin)
       marketplace_fee: platformCommission, 
       statement_descriptor: "EDUVANTAGE CURSOS"
     };
@@ -103,7 +99,6 @@ export const createPreference = async (course: any, user: any, finalPrice?: numb
 
 export const verifyPaymentStatus = async (paymentId: string, instructorId?: string) => {
   try {
-    // Para verificar o status, precisamos do token de quem processou a venda
     const instructorToken = await getInstructorAccessToken(instructorId);
     const adminConfig = await getAdminConfig();
     const accessToken = instructorToken || adminConfig.accessToken;
