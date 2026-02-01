@@ -1,23 +1,56 @@
 
-/**
- * Serviço para integração com PagSeguro
- * Nota: PagSeguro requer integração via backend para gerar o token da sessão ou checkout.
- * Esta função simula a chamada de criação de checkout.
- */
+import { supabase } from './supabase';
 
-export const createPagSeguroCheckout = async (course: any, user: any, instructorConfig: any) => {
-  console.log("Iniciando checkout PagSeguro para o curso:", course.title);
+/**
+ * Busca as credenciais do PagSeguro do professor no Supabase
+ */
+const getInstructorPagSeguro = async (instructorId: string) => {
+  const { data } = await supabase
+    .from('profiles')
+    .select('payment_config')
+    .eq('id', instructorId)
+    .single();
+
+  return data?.payment_config || null;
+};
+
+/**
+ * Gera o link de checkout do PagSeguro.
+ * Como o PagSeguro exige uma chamada de servidor para gerar o ID de checkout,
+ * esta função simula o redirecionamento com os parâmetros básicos de identificação
+ * que seriam enviados para o backend.
+ */
+export const createPagSeguroCheckout = async (course: any, user: any, finalPrice: number) => {
+  const instructorId = course.instructor_id || course.instructorId;
+  const config = await getInstructorPagSeguro(instructorId);
+
+  if (!config || !config.pagseguroEmail) {
+    throw new Error("O instrutor não configurou os dados do PagSeguro.");
+  }
+
+  console.log("Iniciando fluxo PagSeguro para:", config.pagseguroEmail);
+
+  // No fluxo real, você chamaria sua API/Edge Function que faria:
+  // POST https://ws.pagseguro.uol.com.br/v2/checkout?email=...&token=...
   
-  // Em uma aplicação real, aqui faríamos um fetch para o seu backend Node/Edge Function
-  // que utiliza a API do PagSeguro com o e-mail e token do vendedor.
+  // Para fins de demonstração na plataforma, simulamos o redirecionamento:
+  // Em uma integração real via "Checkout Transparente" ou "Lightbox", isso seria diferente.
   
-  const sellerEmail = instructorConfig?.email || 'vendas@eduvantage.com.br';
+  const baseUrl = "https://pagseguro.uol.com.br/v2/checkout/payment.html";
   
-  // URL de exemplo para redirecionamento do PagSeguro (SandBox ou Produção)
-  const baseUrl = "https://pagseguro.uol.com.br/v2/checkout/payment.html?code=";
-  
-  // Simulando retorno de um código de checkout gerado pelo backend
-  const mockCheckoutCode = "8CF677D1ED444955B66D6026903D8E21";
-  
-  return `${baseUrl}${mockCheckoutCode}`;
+  // Exemplo de como os parâmetros seriam passados (URL de exemplo pedagógico)
+  const params = new URLSearchParams({
+    receiverEmail: config.pagseguroEmail,
+    currency: 'BRL',
+    itemId1: course.id.toString(),
+    itemDescription1: course.title,
+    itemAmount1: finalPrice.toFixed(2),
+    itemQuantity1: '1',
+    reference: `${user.id}---${course.id}---${Date.now()}`,
+    senderEmail: user.email
+  });
+
+  // Retornamos a URL de simulação (em produção seria o retorno da API do PagSeguro)
+  // Como estamos no ambiente frontend, orientamos o usuário a simular a compra.
+  return `${baseUrl}?${params.toString()}`;
 };
