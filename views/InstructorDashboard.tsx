@@ -20,7 +20,8 @@ import {
   TrendingUp,
   History,
   ExternalLink,
-  ShieldCheck
+  ShieldCheck,
+  AlertTriangle
 } from 'lucide-react';
 
 const SidebarBtn = ({ active, onClick, icon, label }: any) => (
@@ -94,7 +95,7 @@ export default function InstructorDashboard() {
         .single();
       
       if (profile?.payment_config?.mercadopagoUserId) {
-        setMpUserId(profile.payment_config.mercadopagoUserId);
+        setMpUserId(profile.payment_config.mercadopagoUserId.toString());
       }
 
       const { data: sales } = await supabase
@@ -118,17 +119,24 @@ export default function InstructorDashboard() {
 
   const handleSaveMpSettings = async () => {
     if (!user) return;
+    
+    // Validação simples do ID
+    if (!mpUserId || mpUserId.length < 5) {
+      alert("Por favor, insira um User ID válido do Mercado Pago (apenas números).");
+      return;
+    }
+
     setIsSaving(true);
     try {
       const { error } = await supabase
         .from('profiles')
         .update({ 
-          payment_config: { mercadopagoUserId: mpUserId } 
+          payment_config: { mercadopagoUserId: mpUserId.replace(/\D/g, '') } 
         })
         .eq('id', user.id);
       
       if (error) throw error;
-      alert("Configurações de recebimento salvas!");
+      alert("Sua conta está pronta para receber pagamentos!");
     } catch (err: any) {
       alert("Erro ao salvar: " + err.message);
     } finally {
@@ -323,26 +331,33 @@ export default function InstructorDashboard() {
 
                <div className="space-y-6">
                   <div>
-                      <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">Seu User ID do Mercado Pago</label>
+                      <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">Seu User ID do Mercado Pago (Apenas Números)</label>
                       <input 
                         type="text" 
                         value={mpUserId} 
-                        onChange={e => setMpUserId(e.target.value)} 
+                        onChange={e => setMpUserId(e.target.value.replace(/\D/g, ''))} 
                         className="w-full p-5 bg-slate-50 border border-slate-200 rounded-2xl font-black text-lg text-slate-900 outline-none focus:ring-4 focus:ring-blue-50" 
                         placeholder="Ex: 123456789"
                       />
                       <div className="mt-6 p-6 bg-slate-950 text-white rounded-[32px] space-y-4">
                          <div className="flex items-center gap-2 text-blue-400">
                             <Info size={16} />
-                            <span className="text-[10px] font-black uppercase tracking-widest">Como encontrar seu ID?</span>
+                            <span className="text-[10px] font-black uppercase tracking-widest">Onde encontrar esse número?</span>
                          </div>
-                         <ol className="text-[11px] font-medium space-y-2 opacity-80 list-decimal ml-4">
-                            <li>Acesse seu painel do Mercado Pago.</li>
-                            <li>Vá em <b>Seu Negócio</b> &gt; <b>Configurações</b>.</li>
-                            <li>Ou acesse <a href="https://www.mercadopago.com.br/developers/panel" target="_blank" rel="noopener noreferrer" className="underline text-blue-400">developers/panel</a> e seu User ID estará visível no canto superior.</li>
+                         <ol className="text-[11px] font-medium space-y-3 opacity-80 list-decimal ml-4">
+                            <li>Acesse seu painel em <a href="https://www.mercadopago.com.br/developers/panel" target="_blank" rel="noopener noreferrer" className="underline text-blue-400">mercadopago.com.br/developers/panel</a>.</li>
+                            <li>No canto superior direito, clique no seu nome.</li>
+                            <li>O <b>User ID</b> (também chamado de Collector ID) aparecerá logo abaixo do seu e-mail.</li>
                          </ol>
                       </div>
                   </div>
+               </div>
+
+               <div className="p-6 bg-amber-50 border border-amber-100 rounded-3xl flex gap-4">
+                  <AlertTriangle className="text-amber-500 shrink-0" size={20} />
+                  <p className="text-[10px] font-bold text-amber-700 uppercase leading-relaxed">
+                    Certifique-se de que o número está correto. Se o ID for inválido, os alunos não conseguirão completar o checkout dos seus cursos.
+                  </p>
                </div>
 
                <button 
@@ -359,7 +374,7 @@ export default function InstructorDashboard() {
                   <ShieldCheck size={24} />
                </div>
                <p className="text-xs font-bold text-emerald-800 leading-relaxed uppercase tracking-tight">
-                  Sua conta está segura. Ao usar apenas o User ID, a plataforma nunca terá acesso às suas senhas ou movimentações bancárias.
+                  Sua conta está segura. Ao usar apenas o User ID, a plataforma nunca terá acesso às suas senhas, tokens ou dados bancários privados.
                </p>
             </div>
           </div>

@@ -28,31 +28,29 @@ const getInstructorMPId = async (instructorId: string) => {
 
 /**
  * Cria a preferência de pagamento com SPLIT REAL.
- * 1. Autentica com o Access Token do ADMIN.
- * 2. Define o Professor (collector_id) como recebedor principal.
- * 3. Define a comissão (marketplace_fee) que fica com o ADMIN.
  */
 export const createPreference = async (course: any, user: any, finalPrice?: number) => {
   try {
     const adminConfig = await getAdminConfig();
-    const instructorMpId = await getInstructorMPId(course.instructor_id);
+    const instructorRawId = await getInstructorMPId(course.instructor_id);
     
     const accessToken = adminConfig.accessToken;
     const publicKey = adminConfig.publicKey;
-    const commissionRate = adminConfig.commissionRate || 1; // % da plataforma
+    const commissionRate = adminConfig.commissionRate || 1;
     
     if (!accessToken) {
-      throw new Error("Sistema de pagamentos indisponível: Admin não configurado.");
+      throw new Error("Configuração de pagamento incompleta: Admin não configurado.");
     }
 
-    if (!instructorMpId) {
-      throw new Error("Este professor ainda não configurou sua conta de recebimento Mercado Pago.");
+    // Validação rigorosa do ID do Professor
+    const collectorId = parseInt(instructorRawId || "0", 10);
+    
+    if (isNaN(collectorId) || collectorId <= 0) {
+      throw new Error("O professor deste curso não configurou um User ID válido do Mercado Pago.");
     }
 
     const rawPrice = finalPrice !== undefined ? finalPrice : course.price;
     const price = Number(Number(rawPrice).toFixed(2));
-    
-    // Calcula a comissão do ADMIN (Ex: 10% de R$ 100 = R$ 10)
     const platformFee = Number((price * (commissionRate / 100)).toFixed(2));
 
     const baseUrl = window.location.origin + window.location.pathname + (window.location.pathname.endsWith('/') ? '' : '/') + '#/my-courses';
@@ -79,14 +77,18 @@ export const createPreference = async (course: any, user: any, finalPrice?: numb
       },
       auto_return: 'approved',
       external_reference: externalReference,
-      // CONFIGURAÇÃO DE SPLIT MARKETPLACE:
-      marketplace_fee: platformFee, // Valor que vai para a conta do ADMIN (dono do Access Token)
-      collector_id: Number(instructorMpId), // ID da conta do PROFESSOR (onde o resto do dinheiro cai)
+      marketplace_fee: platformFee, 
+      collector_id: collectorId, // Enviado como número inteiro puro
       statement_descriptor: "EDUVANTAGE",
       binary_mode: true
     };
 
-    // A chamada deve ser feita usando o Access Token do ADMIN
+    console.log("Gerando Preferência MP:", {
+      collector_id: collectorId,
+      fee: platformFee,
+      total: price
+    });
+
     const response = await fetch('https://api.mercadopago.com/checkout/preferences', {
       method: 'POST',
       headers: {
@@ -96,19 +98,18 @@ export const createPreference = async (course: any, user: any, finalPrice?: numb
       body: JSON.stringify(preferenceBody)
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("MP Error Detail:", errorData);
-      throw new Error(errorData.message || "Erro ao configurar divisão de pagamento.");
-    }
+    const responseData = await response.json();
 
-    const preference = await response.json();
+    if (!response.ok) {
+      console.error("Erro API Mercado Pago:", responseData);
+      throw new Error(responseData.message || "Erro na API do Mercado Pago ao processar split.");
+    }
     
     return {
-      id: preference.id,
-      publicKey: publicKey // Frontend usa a chave pública do ADMIN
+      id: responseData.id,
+      publicKey: publicKey 
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Erro MP Preference:", error);
     throw error;
   }
@@ -133,10 +134,6 @@ export const verifyPaymentStatus = async (paymentId: string) => {
   }
 };
 
-// Fixed: Added searchPayments export to fix error in views/MyCourses.tsx on line 7
-/**
- * Busca pagamentos recentes na API do Mercado Pago para sincronização manual de bibliotecas de usuários.
- */
 export const searchPayments = async (limit: number = 20) => {
   try {
     const adminConfig = await getAdminConfig();
