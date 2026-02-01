@@ -14,9 +14,9 @@ const getAdminConfig = async () => {
 };
 
 /**
- * Busca o Access Token do Professor dono do curso
+ * Busca a configuração de pagamento do Professor dono do curso
  */
-const getInstructorAccessToken = async (instructorId?: string) => {
+const getInstructorConfig = async (instructorId?: string) => {
   if (!instructorId) return null;
   
   const { data } = await supabase
@@ -25,32 +25,37 @@ const getInstructorAccessToken = async (instructorId?: string) => {
     .eq('id', instructorId)
     .single();
 
-  return data?.payment_config?.mercadopagoAccessToken || null;
+  return {
+    accessToken: data?.payment_config?.mercadopagoAccessToken || null,
+    publicKey: data?.payment_config?.mercadopagoPublicKey || null
+  };
 };
 
 /**
  * Cria a preferência de pagamento com Split dinâmico (Marketplace Fee)
+ * Retorna { id, publicKey } para garantir que o frontend use a chave correta
  */
 export const createPreference = async (course: any, user: any, finalPrice?: number) => {
   try {
     const adminConfig = await getAdminConfig();
     const instructorId = course.instructor_id || course.instructorId;
-    const instructorToken = await getInstructorAccessToken(instructorId);
+    const instructorConfig = await getInstructorConfig(instructorId);
     
-    // O Access Token deve ser o do PROFESSOR para que ele receba
-    const accessToken = instructorToken || adminConfig.accessToken;
+    // Prioriza as chaves do instrutor. Se não houver, usa as do admin.
+    const accessToken = instructorConfig?.accessToken || adminConfig.accessToken;
+    const publicKey = instructorConfig?.publicKey || adminConfig.publicKey;
     
     // Taxa dinâmica definida pelo admin (default 1%)
     const commissionRate = adminConfig.commissionRate ?? 1;
     
-    if (!accessToken) {
-      throw new Error("O professor deste curso ainda não configurou o Mercado Pago.");
+    if (!accessToken || !publicKey) {
+      throw new Error("As credenciais de pagamento para este curso não foram configuradas corretamente pelo instrutor.");
     }
 
     const rawPrice = finalPrice !== undefined ? finalPrice : course.price;
     const price = Number(Number(rawPrice).toFixed(2));
     
-    // Taxa dinâmica que vai para o dono da aplicação (Admin Master)
+    // Taxa dinâmica que vai para o dono da plataforma (Admin Master)
     const platformFee = Number((price * (commissionRate / 100)).toFixed(2));
 
     const baseUrl = window.location.origin + window.location.pathname + (window.location.pathname.endsWith('/') ? '' : '/') + '#/my-courses';
@@ -77,7 +82,6 @@ export const createPreference = async (course: any, user: any, finalPrice?: numb
       },
       auto_return: 'approved',
       external_reference: externalReference,
-      // marketplace_fee envia a taxa dinâmica para a conta master associada ao token da aplicação
       marketplace_fee: platformFee, 
       statement_descriptor: "EDUVANTAGE"
     };
@@ -97,7 +101,12 @@ export const createPreference = async (course: any, user: any, finalPrice?: numb
     }
 
     const preference = await response.json();
-    return preference.id;
+    
+    // Retornamos o ID e a Public Key que deve ser usada para abrir esse ID específico
+    return {
+      id: preference.id,
+      publicKey: publicKey
+    };
   } catch (error) {
     console.error("Erro MP Preference:", error);
     throw error;
@@ -106,9 +115,9 @@ export const createPreference = async (course: any, user: any, finalPrice?: numb
 
 export const verifyPaymentStatus = async (paymentId: string, instructorId?: string) => {
   try {
-    const instructorToken = await getInstructorAccessToken(instructorId);
+    const instructorConfig = await getInstructorConfig(instructorId);
     const adminConfig = await getAdminConfig();
-    const accessToken = instructorToken || adminConfig.accessToken;
+    const accessToken = (instructorConfig?.accessToken) || adminConfig.accessToken;
     
     const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
       method: 'GET',
@@ -132,9 +141,9 @@ export const verifyPaymentStatus = async (paymentId: string, instructorId?: stri
 
 export const searchPayments = async (limit = 50, instructorId?: string) => {
   try {
-    const instructorToken = await getInstructorAccessToken(instructorId);
+    const instructorConfig = await getInstructorConfig(instructorId);
     const adminConfig = await getAdminConfig();
-    const accessToken = instructorToken || adminConfig.accessToken;
+    const accessToken = (instructorConfig?.accessToken) || adminConfig.accessToken;
 
     const response = await fetch(`https://api.mercadopago.com/v1/payments/search?sort=date_created&criteria=desc&limit=${limit}`, {
       method: 'GET',

@@ -71,7 +71,8 @@ export default function Checkout({ onComplete }: { onComplete: (id: string) => v
     const finalPrice = calculateTotal();
     
     try {
-      const preferenceId = await createPreference(course, user, finalPrice);
+      // O serviço agora retorna a chave pública correta do dono do curso/plataforma
+      const { id: preferenceId, publicKey } = await createPreference(course, user, finalPrice);
       
       // Registrar intenção de compra no banco
       await supabase.from('sales').insert({
@@ -83,11 +84,19 @@ export default function Checkout({ onComplete }: { onComplete: (id: string) => v
         coupon_code: appliedCoupon?.code || null
       });
 
-      // Abrir checkout do Mercado Pago
-      const mp = new (window as any).MercadoPago(user.user_metadata?.mp_public_key || 'APP_USR-70131102-0943-4e4b-97e3-085e35384666'); // Fallback ou do perfil
+      // Abrir checkout do Mercado Pago com a Public Key vinculada ao Token usado
+      if (!(window as any).MercadoPago) {
+        throw new Error("SDK do Mercado Pago não carregado. Tente recarregar a página.");
+      }
+
+      // Inicializa o MP com a chave dinâmica
+      const mp = new (window as any).MercadoPago(publicKey);
+      
+      // Redireciona para o checkout oficial (mais estável para PIX e Cartão)
       window.location.href = `https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=${preferenceId}`;
+      
     } catch (err: any) {
-      alert("Erro Mercado Pago: " + err.message);
+      alert("Erro ao processar pagamento: " + err.message);
     } finally {
       setIsGenerating(false);
     }
