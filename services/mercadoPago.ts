@@ -1,24 +1,29 @@
 
 import { supabase } from './supabase';
 
+/**
+ * Busca o Access Token configurado no banco de dados
+ */
+const getAccessToken = async () => {
+  const { data: configData } = await supabase
+    .from('platform_settings')
+    .select('value')
+    .eq('key', 'mercadopago_config')
+    .single();
+
+  if (!configData?.value?.accessToken) {
+    throw new Error("Access Token não configurado.");
+  }
+  return configData.value.accessToken;
+};
+
+/**
+ * Cria a preferência de pagamento (Checkout Pro)
+ */
 export const createPreference = async (course: any, user: any) => {
   try {
-    // 1. Buscar as configurações do Mercado Pago no Banco
-    const { data: configData } = await supabase
-      .from('platform_settings')
-      .select('value')
-      .eq('key', 'mercadopago_config')
-      .single();
+    const accessToken = await getAccessToken();
 
-    if (!configData?.value?.accessToken) {
-      throw new Error("Access Token do Mercado Pago não configurado no Admin.");
-    }
-
-    const accessToken = configData.value.accessToken;
-
-    // 2. Criar a preferência na API do Mercado Pago
-    // Nota: Em produção, isso deve ser feito em uma Edge Function por segurança.
-    // Aqui fazemos direto para demonstração da funcionalidade.
     const response = await fetch('https://api.mercadopago.com/checkout/preferences', {
       method: 'POST',
       headers: {
@@ -53,5 +58,60 @@ export const createPreference = async (course: any, user: any) => {
   } catch (error) {
     console.error("Erro ao criar preferência:", error);
     throw error;
+  }
+};
+
+/**
+ * Consulta a API do Mercado Pago para confirmar se o pagamento foi aprovado
+ */
+export const verifyPaymentStatus = async (paymentId: string) => {
+  try {
+    const accessToken = await getAccessToken();
+    
+    const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      }
+    });
+
+    if (!response.ok) return { approved: false, error: 'Pagamento não encontrado' };
+
+    const paymentData = await response.json();
+    
+    return {
+      approved: paymentData.status === 'approved',
+      status: paymentData.status,
+      external_reference: paymentData.external_reference,
+      amount: paymentData.transaction_amount
+    };
+  } catch (error) {
+    console.error("Erro na verificação do pagamento:", error);
+    return { approved: false, error: 'Falha na comunicação com o gateway' };
+  }
+};
+
+/**
+ * BUSCA INTEGRADA: Lista os pagamentos recentes da conta do Mercado Pago
+ */
+export const searchPayments = async (limit = 50) => {
+  try {
+    const accessToken = await getAccessToken();
+    
+    // Busca pagamentos ordenados pelos mais recentes
+    const response = await fetch(`https://api.mercadopago.com/v1/payments/search?sort=date_created&criteria=desc&limit=${limit}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      }
+    });
+
+    if (!response.ok) throw new Error("Não foi possível buscar os pagamentos.");
+
+    const data = await response.json();
+    return data.results; // Array de pagamentos
+  } catch (error) {
+    console.error("Erro ao buscar pagamentos no MP:", error);
+    return [];
   }
 };
