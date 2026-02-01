@@ -2,7 +2,7 @@
 import { supabase } from './supabase';
 
 /**
- * Busca a configuração Master do Admin
+ * Busca a configuração Master do Admin (Dono da Plataforma)
  */
 const getAdminConfig = async () => {
   const { data } = await supabase
@@ -14,53 +14,49 @@ const getAdminConfig = async () => {
 };
 
 /**
- * Busca a configuração de pagamento do Professor dono do curso
+ * Busca o ID de Recebedor (Collector ID) do Professor
  */
-const getInstructorConfig = async (instructorId?: string) => {
-  if (!instructorId) return null;
-  
+const getInstructorMPId = async (instructorId: string) => {
   const { data } = await supabase
     .from('profiles')
     .select('payment_config')
     .eq('id', instructorId)
     .single();
-
-  return {
-    accessToken: data?.payment_config?.mercadopagoAccessToken || null,
-    publicKey: data?.payment_config?.mercadopagoPublicKey || null
-  };
+  
+  return data?.payment_config?.mercadopagoUserId || null;
 };
 
 /**
- * Cria a preferência de pagamento com Split dinâmico (Marketplace Fee)
- * Retorna { id, publicKey } para garantir que o frontend use a chave correta
+ * Cria a preferência de pagamento com SPLIT REAL.
+ * 1. Autentica com o Access Token do ADMIN.
+ * 2. Define o Professor (collector_id) como recebedor principal.
+ * 3. Define a comissão (marketplace_fee) que fica com o ADMIN.
  */
 export const createPreference = async (course: any, user: any, finalPrice?: number) => {
   try {
     const adminConfig = await getAdminConfig();
-    const instructorId = course.instructor_id || course.instructorId;
-    const instructorConfig = await getInstructorConfig(instructorId);
+    const instructorMpId = await getInstructorMPId(course.instructor_id);
     
-    // Prioriza as chaves do instrutor. Se não houver, usa as do admin.
-    const accessToken = instructorConfig?.accessToken || adminConfig.accessToken;
-    const publicKey = instructorConfig?.publicKey || adminConfig.publicKey;
+    const accessToken = adminConfig.accessToken;
+    const publicKey = adminConfig.publicKey;
+    const commissionRate = adminConfig.commissionRate || 1; // % da plataforma
     
-    // Taxa dinâmica definida pelo admin (default 1%)
-    const commissionRate = adminConfig.commissionRate ?? 1;
-    
-    if (!accessToken || !publicKey) {
-      throw new Error("As credenciais de pagamento para este curso não foram configuradas corretamente pelo instrutor.");
+    if (!accessToken) {
+      throw new Error("Sistema de pagamentos indisponível: Admin não configurado.");
+    }
+
+    if (!instructorMpId) {
+      throw new Error("Este professor ainda não configurou sua conta de recebimento Mercado Pago.");
     }
 
     const rawPrice = finalPrice !== undefined ? finalPrice : course.price;
     const price = Number(Number(rawPrice).toFixed(2));
     
-    // Taxa dinâmica que vai para o dono da plataforma (Admin Master)
+    // Calcula a comissão do ADMIN (Ex: 10% de R$ 100 = R$ 10)
     const platformFee = Number((price * (commissionRate / 100)).toFixed(2));
 
     const baseUrl = window.location.origin + window.location.pathname + (window.location.pathname.endsWith('/') ? '' : '/') + '#/my-courses';
-    const attemptId = Date.now().toString().slice(-6);
-    const externalReference = `${user.id}---${course.id}---${attemptId}`;
+    const externalReference = `${user.id}---${course.id}---${Date.now()}`;
 
     const preferenceBody = {
       items: [
@@ -69,7 +65,8 @@ export const createPreference = async (course: any, user: any, finalPrice?: numb
           title: course.title,
           unit_price: price,
           quantity: 1,
-          currency_id: 'BRL'
+          currency_id: 'BRL',
+          picture_url: course.thumbnail
         }
       ],
       payer: {
@@ -82,10 +79,14 @@ export const createPreference = async (course: any, user: any, finalPrice?: numb
       },
       auto_return: 'approved',
       external_reference: externalReference,
-      marketplace_fee: platformFee, 
-      statement_descriptor: "EDUVANTAGE"
+      // CONFIGURAÇÃO DE SPLIT MARKETPLACE:
+      marketplace_fee: platformFee, // Valor que vai para a conta do ADMIN (dono do Access Token)
+      collector_id: Number(instructorMpId), // ID da conta do PROFESSOR (onde o resto do dinheiro cai)
+      statement_descriptor: "EDUVANTAGE",
+      binary_mode: true
     };
 
+    // A chamada deve ser feita usando o Access Token do ADMIN
     const response = await fetch('https://api.mercadopago.com/checkout/preferences', {
       method: 'POST',
       headers: {
@@ -97,15 +98,15 @@ export const createPreference = async (course: any, user: any, finalPrice?: numb
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.message || "Erro ao gerar checkout do Mercado Pago");
+      console.error("MP Error Detail:", errorData);
+      throw new Error(errorData.message || "Erro ao configurar divisão de pagamento.");
     }
 
     const preference = await response.json();
     
-    // Retornamos o ID e a Public Key que deve ser usada para abrir esse ID específico
     return {
       id: preference.id,
-      publicKey: publicKey
+      publicKey: publicKey // Frontend usa a chave pública do ADMIN
     };
   } catch (error) {
     console.error("Erro MP Preference:", error);
@@ -113,45 +114,45 @@ export const createPreference = async (course: any, user: any, finalPrice?: numb
   }
 };
 
-export const verifyPaymentStatus = async (paymentId: string, instructorId?: string) => {
+export const verifyPaymentStatus = async (paymentId: string) => {
   try {
-    const instructorConfig = await getInstructorConfig(instructorId);
     const adminConfig = await getAdminConfig();
-    const accessToken = (instructorConfig?.accessToken) || adminConfig.accessToken;
-    
     const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
       method: 'GET',
-      headers: { 'Authorization': `Bearer ${accessToken}` }
+      headers: { 'Authorization': `Bearer ${adminConfig.accessToken}` }
     });
-
-    if (!response.ok) return { approved: false, status: 'not_found' };
-
     const paymentData = await response.json();
     return {
       approved: paymentData.status === 'approved',
       status: paymentData.status,
       external_reference: paymentData.external_reference,
-      amount: paymentData.transaction_amount,
-      id: paymentData.id
+      amount: paymentData.transaction_amount
     };
   } catch (error) {
     return { approved: false, status: 'error' };
   }
 };
 
-export const searchPayments = async (limit = 50, instructorId?: string) => {
+// Fixed: Added searchPayments export to fix error in views/MyCourses.tsx on line 7
+/**
+ * Busca pagamentos recentes na API do Mercado Pago para sincronização manual de bibliotecas de usuários.
+ */
+export const searchPayments = async (limit: number = 20) => {
   try {
-    const instructorConfig = await getInstructorConfig(instructorId);
     const adminConfig = await getAdminConfig();
-    const accessToken = (instructorConfig?.accessToken) || adminConfig.accessToken;
+    if (!adminConfig.accessToken) return [];
 
-    const response = await fetch(`https://api.mercadopago.com/v1/payments/search?sort=date_created&criteria=desc&limit=${limit}`, {
+    const response = await fetch(`https://api.mercadopago.com/v1/payments/search?limit=${limit}&sort=date_created&criteria=desc`, {
       method: 'GET',
-      headers: { 'Authorization': `Bearer ${accessToken}` }
+      headers: { 'Authorization': `Bearer ${adminConfig.accessToken}` }
     });
+    
+    if (!response.ok) return [];
+    
     const data = await response.json();
     return data.results || [];
   } catch (error) {
+    console.error("Erro ao buscar pagamentos Mercado Pago:", error);
     return [];
   }
 };

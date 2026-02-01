@@ -15,13 +15,12 @@ import {
   X,
   Settings,
   ArrowLeft,
-  Key,
-  Lock,
   Trash2,
-  PlayCircle,
-  Clock,
-  ChevronDown,
-  ChevronUp
+  Wallet,
+  TrendingUp,
+  History,
+  ExternalLink,
+  ShieldCheck
 } from 'lucide-react';
 
 const SidebarBtn = ({ active, onClick, icon, label }: any) => (
@@ -49,7 +48,7 @@ const StatCard = ({ label, value, icon, trend }: any) => (
 );
 
 export default function InstructorDashboard() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'courses' | 'marketplace' | 'edit-course'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'courses' | 'finance' | 'settings' | 'edit-course'>('overview');
   const [loading, setLoading] = useState(true);
   const [courses, setCourses] = useState<any[]>([]);
   const [editingCourse, setEditingCourse] = useState<any>(null);
@@ -57,12 +56,8 @@ export default function InstructorDashboard() {
   const [isSaving, setIsSaving] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [stats, setStats] = useState({ totalRevenue: 0, totalStudents: 0, activeCourses: 0 });
-
-  const [paymentConfig, setPaymentConfig] = useState({
-    gateway: 'mercadopago',
-    mercadopagoPublicKey: '',
-    mercadopagoAccessToken: ''
-  });
+  const [salesList, setSalesList] = useState<any[]>([]);
+  const [mpUserId, setMpUserId] = useState('');
 
   const [newCourse, setNewCourse] = useState({
     title: '',
@@ -98,19 +93,21 @@ export default function InstructorDashboard() {
         .eq('id', session.user.id)
         .single();
       
-      if (profile?.payment_config) {
-        setPaymentConfig(prev => ({ ...prev, ...profile.payment_config }));
+      if (profile?.payment_config?.mercadopagoUserId) {
+        setMpUserId(profile.payment_config.mercadopagoUserId);
       }
 
       const { data: sales } = await supabase
         .from('sales')
-        .select('amount, status')
+        .select(`*, course:courses(title), user:profiles(full_name)`)
         .in('course_id', (coursesData || []).map(c => c.id))
-        .eq('status', 'Pago');
+        .eq('status', 'Pago')
+        .order('created_at', { ascending: false });
       
       if (sales) {
         const total = sales.reduce((acc, s) => acc + s.amount, 0);
         setStats(prev => ({ ...prev, totalRevenue: total, totalStudents: sales.length }));
+        setSalesList(sales);
       }
     } catch (err) {
       console.error(err);
@@ -119,17 +116,19 @@ export default function InstructorDashboard() {
     }
   }
 
-  const handleSavePaymentConfig = async () => {
+  const handleSaveMpSettings = async () => {
     if (!user) return;
     setIsSaving(true);
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ payment_config: paymentConfig })
+        .update({ 
+          payment_config: { mercadopagoUserId: mpUserId } 
+        })
         .eq('id', user.id);
       
       if (error) throw error;
-      alert("Configurações do Mercado Pago salvas com sucesso!");
+      alert("Configurações de recebimento salvas!");
     } catch (err: any) {
       alert("Erro ao salvar: " + err.message);
     } finally {
@@ -141,7 +140,6 @@ export default function InstructorDashboard() {
     e.preventDefault();
     if (!user) return;
     setIsSaving(true);
-
     try {
       const { data, error } = await supabase
         .from('courses')
@@ -156,15 +154,10 @@ export default function InstructorDashboard() {
           rating: 5.0,
           students: 0
         })
-        .select()
-        .single();
-
+        .select().single();
       if (error) throw error;
-
       setCourses([data, ...courses]);
-      setStats(prev => ({ ...prev, activeCourses: prev.activeCourses + 1 }));
       setShowCreateModal(false);
-      setNewCourse({ title: '', description: '', price: '', thumbnail: 'https://picsum.photos/seed/course/800/450' });
       setEditingCourse(data);
       setActiveTab('edit-course');
     } catch (err: any) {
@@ -189,9 +182,8 @@ export default function InstructorDashboard() {
         price: parseFloat(editingCourse.price),
         description: editingCourse.description
       }).eq('id', editingCourse.id);
-      
       if (error) throw error;
-      alert("Curso atualizado com sucesso!");
+      alert("Curso atualizado!");
       loadInstructorData();
       setActiveTab('courses');
     } catch (err: any) { 
@@ -201,53 +193,27 @@ export default function InstructorDashboard() {
     }
   };
 
+  const updateModuleTitle = (moduleId: string, title: string) => {
+    setEditingCourse({
+      ...editingCourse,
+      modules: editingCourse.modules.map((m: any) => m.id === moduleId ? { ...m, title } : m)
+    });
+  };
+
   const addModule = () => {
-    const newModule = {
-      id: Math.random().toString(36).substr(2, 9),
-      title: 'Novo Módulo',
-      lessons: []
-    };
+    const newModule = { id: Math.random().toString(36).substr(2, 9), title: 'Novo Módulo', lessons: [] };
     setEditingCourse({ ...editingCourse, modules: [...editingCourse.modules, newModule] });
   };
 
   const removeModule = (moduleId: string) => {
-    setEditingCourse({
-      ...editingCourse,
-      modules: editingCourse.modules.filter((m: any) => m.id !== moduleId)
-    });
+    setEditingCourse({ ...editingCourse, modules: editingCourse.modules.filter((m: any) => m.id !== moduleId) });
   };
 
   const addLesson = (moduleId: string) => {
-    const newLesson = {
-      id: Math.random().toString(36).substr(2, 9),
-      title: 'Nova Aula',
-      duration: '00:00',
-      videoUrl: '',
-      description: ''
-    };
+    const newLesson = { id: Math.random().toString(36).substr(2, 9), title: 'Nova Aula', duration: '10:00', videoUrl: '', description: '' };
     setEditingCourse({
       ...editingCourse,
-      modules: editingCourse.modules.map((m: any) => 
-        m.id === moduleId ? { ...m, lessons: [...m.lessons, newLesson] } : m
-      )
-    });
-  };
-
-  const removeLesson = (moduleId: string, lessonId: string) => {
-    setEditingCourse({
-      ...editingCourse,
-      modules: editingCourse.modules.map((m: any) => 
-        m.id === moduleId ? { ...m, lessons: m.lessons.filter((l: any) => l.id !== lessonId) } : m
-      )
-    });
-  };
-
-  const updateModuleTitle = (moduleId: string, title: string) => {
-    setEditingCourse({
-      ...editingCourse,
-      modules: editingCourse.modules.map((m: any) => 
-        m.id === moduleId ? { ...m, title } : m
-      )
+      modules: editingCourse.modules.map((m: any) => m.id === moduleId ? { ...m, lessons: [...m.lessons, newLesson] } : m)
     });
   };
 
@@ -263,6 +229,15 @@ export default function InstructorDashboard() {
     });
   };
 
+  const removeLesson = (moduleId: string, lessonId: string) => {
+    setEditingCourse({
+      ...editingCourse,
+      modules: editingCourse.modules.map((m: any) => 
+        m.id === moduleId ? { ...m, lessons: m.lessons.filter((l: any) => l.id !== lessonId) } : m
+      )
+    });
+  };
+
   if (loading) return <div className="h-screen flex items-center justify-center bg-slate-50"><Loader2 className="animate-spin text-indigo-600" size={40} /></div>;
 
   return (
@@ -274,14 +249,14 @@ export default function InstructorDashboard() {
           </div>
           <div>
             <h2 className="text-xl font-black italic tracking-tighter text-white uppercase">Prof. Hub</h2>
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-[0.2em]">Mercado Pago LMS</p>
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-[0.2em]">Split Real LMS</p>
           </div>
         </div>
 
         <nav className="space-y-3">
           <SidebarBtn active={activeTab === 'overview'} onClick={() => setActiveTab('overview')} icon={<LayoutDashboard size={18} />} label="Resultados" />
           <SidebarBtn active={activeTab === 'courses' || activeTab === 'edit-course'} onClick={() => setActiveTab('courses')} icon={<BookOpen size={18} />} label="Meus Cursos" />
-          <SidebarBtn active={activeTab === 'marketplace'} onClick={() => setActiveTab('marketplace')} icon={<CreditCard size={18} />} label="Mercado Pago" />
+          <SidebarBtn active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<CreditCard size={18} />} label="Pagamento" />
         </nav>
       </div>
 
@@ -290,48 +265,102 @@ export default function InstructorDashboard() {
           <div className="space-y-12 animate-fade-in">
             <header>
               <h1 className="text-4xl font-black text-slate-900 tracking-tight italic uppercase">Painel Geral</h1>
-              <p className="text-slate-500 font-medium text-sm">Visão consolidada das suas vendas.</p>
+              <p className="text-slate-500 font-medium text-sm">Acompanhe suas vendas em tempo real.</p>
             </header>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <StatCard label="Receita Bruta" value={`R$ ${stats.totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon={<DollarSign className="text-indigo-500" />} trend="Total vendido" />
+              <StatCard label="Minha Receita" value={`R$ ${stats.totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon={<DollarSign className="text-indigo-500" />} trend="Recebido via Split" />
               <StatCard label="Total Alunos" value={stats.totalStudents.toString()} icon={<Users className="text-sky-500" />} trend="Estudantes" />
-              <StatCard label="Cursos Ativos" value={stats.activeCourses.toString()} icon={<BookOpen className="text-amber-500" />} trend="Publicados" />
+              <StatCard label="Cursos" value={stats.activeCourses.toString()} icon={<BookOpen className="text-amber-500" />} trend="Ativos" />
             </div>
+            
+            <section className="bg-white p-10 rounded-[40px] border border-slate-200">
+               <h3 className="text-lg font-black uppercase italic tracking-tighter flex items-center gap-3 mb-8">
+                  <TrendingUp className="text-indigo-600" /> Vendas Recentes
+               </h3>
+               <div className="overflow-x-auto">
+                 <table className="w-full text-left">
+                   <thead>
+                     <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">
+                       <th className="pb-4">Aluno</th>
+                       <th className="pb-4">Curso</th>
+                       <th className="pb-4">Valor</th>
+                       <th className="pb-4 text-right">Data</th>
+                     </tr>
+                   </thead>
+                   <tbody>
+                     {salesList.map((sale) => (
+                       <tr key={sale.id} className="text-sm border-b border-slate-50 last:border-0">
+                         <td className="py-4 font-bold text-slate-900">{sale.user?.full_name || 'Aluno'}</td>
+                         <td className="py-4 text-slate-500 font-medium">{sale.course?.title}</td>
+                         <td className="py-4 font-black text-emerald-600">R$ {sale.amount.toFixed(2)}</td>
+                         <td className="py-4 text-right text-slate-400 font-bold text-xs">{new Date(sale.created_at).toLocaleDateString()}</td>
+                       </tr>
+                     ))}
+                   </tbody>
+                 </table>
+               </div>
+            </section>
           </div>
         )}
 
-        {activeTab === 'marketplace' && (
-          <div className="max-w-3xl animate-fade-in space-y-8">
+        {activeTab === 'settings' && (
+          <div className="max-w-3xl animate-fade-in space-y-12">
             <header>
-              <div className="flex items-center gap-4 mb-2">
-                 <img src="https://logodownload.org/wp-content/uploads/2017/06/mercado-pago-logo-1.png" className="h-8" alt="Mercado Pago" />
-              </div>
-              <h1 className="text-3xl font-black text-slate-900 italic uppercase">Credenciais de Recebimento</h1>
-              <p className="text-slate-500 font-medium">Configure seu Mercado Pago para receber pelas vendas dos seus cursos.</p>
+              <h1 className="text-3xl font-black text-slate-900 italic uppercase">Configuração de Recebimento</h1>
+              <p className="text-slate-500 font-medium">O dinheiro das vendas cairá diretamente na sua conta Mercado Pago através do sistema de Split.</p>
             </header>
-            <div className="bg-white p-10 rounded-[40px] border border-slate-200 shadow-sm space-y-8">
-               <div className="space-y-6">
-                  <div>
-                      <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">Public Key (Produção)</label>
-                      <div className="relative">
-                        <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input type="text" value={paymentConfig.mercadopagoPublicKey} onChange={e => setPaymentConfig({...paymentConfig, mercadopagoPublicKey: e.target.value})} className="w-full p-4 pl-12 bg-slate-50 border border-slate-200 rounded-2xl font-mono text-xs outline-none" placeholder="APP_USR-..." />
-                      </div>
+
+            <div className="bg-white p-12 rounded-[48px] border border-slate-200 shadow-sm space-y-8">
+               <div className="flex items-center gap-4 border-b border-slate-50 pb-8">
+                  <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center">
+                    <img src="https://logodownload.org/wp-content/uploads/2017/06/mercado-pago-logo-1.png" className="h-6" alt="MP" />
                   </div>
                   <div>
-                      <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">Access Token (Produção)</label>
-                      <div className="relative">
-                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input type="password" value={paymentConfig.mercadopagoAccessToken} onChange={e => setPaymentConfig({...paymentConfig, mercadopagoAccessToken: e.target.value})} className="w-full p-4 pl-12 bg-slate-50 border border-slate-200 rounded-2xl font-mono text-xs outline-none" placeholder="APP_USR-..." />
-                      </div>
-                      <p className="mt-4 text-[9px] text-slate-400 font-bold uppercase leading-relaxed">
-                        Obtenha em: Suas Integrações &gt; Credenciais de Produção.
-                      </p>
+                    <h3 className="font-black italic uppercase tracking-tighter">Sua Conta de Vendedor</h3>
+                    <p className="text-xs text-slate-400 font-bold uppercase">Integração via Collector ID</p>
                   </div>
                </div>
-               <button onClick={handleSavePaymentConfig} disabled={isSaving} className="w-full bg-slate-900 text-white py-6 rounded-3xl font-black text-lg hover:bg-slate-800 transition-all shadow-xl flex items-center justify-center gap-3">
-                  {isSaving ? <Loader2 className="animate-spin" /> : <><Save size={20} /> Salvar Credenciais</>}
+
+               <div className="space-y-6">
+                  <div>
+                      <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">Seu User ID do Mercado Pago</label>
+                      <input 
+                        type="text" 
+                        value={mpUserId} 
+                        onChange={e => setMpUserId(e.target.value)} 
+                        className="w-full p-5 bg-slate-50 border border-slate-200 rounded-2xl font-black text-lg text-slate-900 outline-none focus:ring-4 focus:ring-blue-50" 
+                        placeholder="Ex: 123456789"
+                      />
+                      <div className="mt-6 p-6 bg-slate-950 text-white rounded-[32px] space-y-4">
+                         <div className="flex items-center gap-2 text-blue-400">
+                            <Info size={16} />
+                            <span className="text-[10px] font-black uppercase tracking-widest">Como encontrar seu ID?</span>
+                         </div>
+                         <ol className="text-[11px] font-medium space-y-2 opacity-80 list-decimal ml-4">
+                            <li>Acesse seu painel do Mercado Pago.</li>
+                            <li>Vá em <b>Seu Negócio</b> > <b>Configurações</b>.</li>
+                            <li>Ou acesse <a href="https://www.mercadopago.com.br/developers/panel" target="_blank" className="underline text-blue-400">developers/panel</a> e seu User ID estará visível no canto superior.</li>
+                         </ol>
+                      </div>
+                  </div>
+               </div>
+
+               <button 
+                 onClick={handleSaveMpSettings} 
+                 disabled={isSaving}
+                 className="w-full bg-slate-900 text-white py-6 rounded-3xl font-black text-lg hover:bg-blue-600 transition-all shadow-xl flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
+               >
+                  {isSaving ? <Loader2 className="animate-spin" /> : <><Save size={20} /> Ativar Recebimento Direto</>}
                </button>
+            </div>
+
+            <div className="bg-emerald-50 p-8 rounded-[40px] border border-emerald-100 flex gap-6 items-center">
+               <div className="w-12 h-12 bg-emerald-500 text-white rounded-2xl flex items-center justify-center shrink-0">
+                  <ShieldCheck size={24} />
+               </div>
+               <p className="text-xs font-bold text-emerald-800 leading-relaxed uppercase tracking-tight">
+                  Sua conta está segura. Ao usar apenas o User ID, a plataforma nunca terá acesso às suas senhas ou movimentações bancárias.
+               </p>
             </div>
           </div>
         )}
@@ -372,12 +401,9 @@ export default function InstructorDashboard() {
                   <button onClick={() => setActiveTab('courses')} className="w-12 h-12 bg-white border border-slate-200 rounded-2xl flex items-center justify-center hover:bg-slate-50 transition-all">
                     <ArrowLeft size={20} />
                   </button>
-                  <div>
-                    <h1 className="text-3xl font-black text-slate-900 italic uppercase tracking-tighter">Editando: {editingCourse.title}</h1>
-                    <p className="text-slate-500 font-bold text-[10px] uppercase tracking-widest">Ajuste o conteúdo e a precificação do seu treinamento.</p>
-                  </div>
+                  <h1 className="text-3xl font-black text-slate-900 italic uppercase tracking-tighter">Editando: {editingCourse.title}</h1>
                 </div>
-                <button onClick={handleSaveCourseContent} disabled={isSaving} className="bg-emerald-600 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-xl shadow-emerald-100 active:scale-95 disabled:opacity-50">
+                <button onClick={handleSaveCourseContent} disabled={isSaving} className="bg-emerald-600 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-xl active:scale-95 disabled:opacity-50">
                   {isSaving ? <Loader2 size={18} className="animate-spin" /> : <><Save size={18} /> Salvar Alterações</>}
                 </button>
              </header>
@@ -387,130 +413,45 @@ export default function InstructorDashboard() {
                    <section className="bg-white p-10 rounded-[40px] border border-slate-200 shadow-sm space-y-8">
                       <div className="flex items-center gap-3 border-b border-slate-100 pb-6">
                          <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center"><BookOpen size={20} /></div>
-                         <h3 className="text-lg font-black uppercase italic tracking-tight">Estrutura Curricular</h3>
+                         <h3 className="text-lg font-black uppercase italic tracking-tight">Grade de Aulas</h3>
                       </div>
 
                       <div className="space-y-6">
                          {editingCourse.modules.map((module: any, mIdx: number) => (
                            <div key={module.id} className="border border-slate-100 rounded-3xl overflow-hidden bg-slate-50/50">
                               <div className="p-6 bg-slate-100 flex items-center justify-between gap-4">
-                                 <div className="flex-grow flex items-center gap-4">
-                                    <span className="text-[10px] font-black bg-slate-900 text-white w-6 h-6 flex items-center justify-center rounded-lg">{mIdx + 1}</span>
-                                    <input 
-                                      type="text" 
-                                      value={module.title} 
-                                      onChange={(e) => updateModuleTitle(module.id, e.target.value)}
-                                      className="bg-transparent border-none font-black uppercase text-xs outline-none focus:text-indigo-600 flex-grow"
-                                      placeholder="Título do Módulo"
-                                    />
-                                 </div>
-                                 <button onClick={() => removeModule(module.id)} className="text-slate-400 hover:text-rose-600 transition-colors"><Trash2 size={16} /></button>
+                                 <input 
+                                   type="text" 
+                                   value={module.title} 
+                                   onChange={(e) => updateModuleTitle(module.id, e.target.value)}
+                                   className="bg-transparent border-none font-black uppercase text-xs outline-none focus:text-indigo-600 flex-grow"
+                                 />
+                                 <button onClick={() => removeModule(module.id)} className="text-rose-500"><Trash2 size={16} /></button>
                               </div>
                               <div className="p-6 space-y-4">
                                  {module.lessons.map((lesson: any, lIdx: number) => (
-                                   <div key={lesson.id} className="bg-white p-6 rounded-2xl border border-slate-100 space-y-4 group">
-                                      <div className="flex justify-between items-center">
-                                         <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Aula {lIdx + 1}</span>
-                                         <button onClick={() => removeLesson(module.id, lesson.id)} className="opacity-0 group-hover:opacity-100 text-rose-500 hover:text-rose-700 transition-all"><X size={14} /></button>
-                                      </div>
+                                   <div key={lesson.id} className="bg-white p-6 rounded-2xl border border-slate-100 space-y-4">
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                         <div className="space-y-1">
-                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Título da Aula</label>
-                                            <input 
-                                              type="text" 
-                                              value={lesson.title} 
-                                              onChange={(e) => updateLesson(module.id, lesson.id, 'title', e.target.value)}
-                                              className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 text-xs font-bold outline-none"
-                                            />
-                                         </div>
-                                         <div className="space-y-1">
-                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Link do Vídeo (Embed)</label>
-                                            <input 
-                                              type="text" 
-                                              value={lesson.videoUrl} 
-                                              onChange={(e) => updateLesson(module.id, lesson.id, 'videoUrl', e.target.value)}
-                                              className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 text-xs font-bold outline-none"
-                                              placeholder="https://youtube.com/embed/..."
-                                            />
-                                         </div>
+                                         <input type="text" value={lesson.title} onChange={e => updateLesson(module.id, lesson.id, 'title', e.target.value)} className="w-full bg-slate-50 p-3 rounded-xl text-xs font-bold" placeholder="Título" />
+                                         <input type="text" value={lesson.videoUrl} onChange={e => updateLesson(module.id, lesson.id, 'videoUrl', e.target.value)} className="w-full bg-slate-50 p-3 rounded-xl text-xs font-bold" placeholder="URL Vídeo" />
                                       </div>
-                                      <div className="flex gap-4">
-                                        <div className="w-32 space-y-1">
-                                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Duração</label>
-                                          <input 
-                                              type="text" 
-                                              value={lesson.duration} 
-                                              onChange={(e) => updateLesson(module.id, lesson.id, 'duration', e.target.value)}
-                                              className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 text-xs font-bold outline-none"
-                                              placeholder="10:00"
-                                            />
-                                        </div>
-                                        <div className="flex-grow space-y-1">
-                                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Descrição curta</label>
-                                          <input 
-                                              type="text" 
-                                              value={lesson.description} 
-                                              onChange={(e) => updateLesson(module.id, lesson.id, 'description', e.target.value)}
-                                              className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 text-xs font-bold outline-none"
-                                            />
-                                        </div>
-                                      </div>
+                                      <button onClick={() => removeLesson(module.id, lesson.id)} className="text-[10px] text-rose-500 font-bold uppercase">Remover Aula</button>
                                    </div>
                                  ))}
-                                 <button onClick={() => addLesson(module.id)} className="w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black uppercase text-slate-400 hover:bg-white hover:text-indigo-600 hover:border-indigo-200 transition-all flex items-center justify-center gap-2">
-                                    <Plus size={14} /> Adicionar Aula ao Módulo
-                                 </button>
+                                 <button onClick={() => addLesson(module.id)} className="w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black uppercase text-slate-400">Adicionar Aula</button>
                               </div>
                            </div>
                          ))}
-                         <button onClick={addModule} className="w-full py-6 bg-slate-900 text-white rounded-3xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-indigo-600 transition-all shadow-xl">
-                            <Plus size={18} /> Novo Módulo Estrutural
-                         </button>
+                         <button onClick={addModule} className="w-full py-6 bg-slate-900 text-white rounded-3xl font-black text-xs uppercase tracking-widest">Novo Módulo</button>
                       </div>
                    </section>
                 </div>
-
+                
                 <aside className="space-y-8">
-                   <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-6">
-                      <h4 className="text-sm font-black uppercase italic tracking-widest border-b border-slate-50 pb-4">Informações de Venda</h4>
-                      <div className="space-y-4">
-                         <div>
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Preço do Treinamento (R$)</label>
-                            <div className="relative">
-                               <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500" size={18} />
-                               <input 
-                                 type="number" 
-                                 value={editingCourse.price} 
-                                 onChange={(e) => setEditingCourse({...editingCourse, price: e.target.value})}
-                                 className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 pl-12 pr-4 font-black text-xl text-slate-900 outline-none focus:ring-4 focus:ring-emerald-50" 
-                               />
-                            </div>
-                         </div>
-                         <div>
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Título Público</label>
-                            <input 
-                               type="text" 
-                               value={editingCourse.title} 
-                               onChange={(e) => setEditingCourse({...editingCourse, title: e.target.value})}
-                               className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 font-bold text-sm outline-none" 
-                            />
-                         </div>
-                         <div>
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Descrição Breve</label>
-                            <textarea 
-                               rows={4}
-                               value={editingCourse.description} 
-                               onChange={(e) => setEditingCourse({...editingCourse, description: e.target.value})}
-                               className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 font-medium text-sm outline-none resize-none" 
-                            />
-                         </div>
-                      </div>
-                   </div>
-
-                   <div className="bg-indigo-600 p-8 rounded-[40px] text-white space-y-4 shadow-xl shadow-indigo-100">
-                      <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><Zap size={20} /></div>
-                      <h4 className="font-black italic uppercase tracking-tighter">Dica do Professor</h4>
-                      <p className="text-xs font-medium opacity-80 leading-relaxed">Módulos bem estruturados aumentam a taxa de conclusão dos alunos em até 40%. Use títulos claros e diretos.</p>
+                   <div className="bg-white p-8 rounded-[40px] border border-slate-200 space-y-6">
+                      <h4 className="text-sm font-black uppercase italic tracking-widest">Preço e Visibilidade</h4>
+                      <input type="number" value={editingCourse.price} onChange={e => setEditingCourse({...editingCourse, price: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 font-black text-xl" />
+                      <textarea rows={4} value={editingCourse.description} onChange={e => setEditingCourse({...editingCourse, description: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm font-medium outline-none resize-none" placeholder="Descrição" />
                    </div>
                 </aside>
              </div>
@@ -527,7 +468,7 @@ export default function InstructorDashboard() {
                 <form onSubmit={handleCreateCourse} className="p-10 space-y-6">
                    <input required type="text" value={newCourse.title} onChange={e => setNewCourse({...newCourse, title: e.target.value})} placeholder="Título do Curso" className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 font-bold" />
                    <input required type="number" value={newCourse.price} onChange={e => setNewCourse({...newCourse, price: e.target.value})} placeholder="Preço (R$)" className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 font-bold" />
-                   <button type="submit" disabled={isSaving} className="w-full bg-indigo-600 text-white py-6 rounded-3xl font-black text-lg shadow-xl shadow-indigo-100 transition-transform active:scale-95">Criar Curso</button>
+                   <button type="submit" disabled={isSaving} className="w-full bg-indigo-600 text-white py-6 rounded-3xl font-black text-lg shadow-xl transition-transform active:scale-95">Criar Curso</button>
                 </form>
              </div>
           </div>
