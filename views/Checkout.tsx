@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ShieldCheck, Lock, ChevronLeft, Loader2, Wallet, CheckCircle2, ArrowRight, Tag, X } from 'lucide-react';
 import { COURSES } from '../constants';
 import { supabase } from '../services/supabase';
-import { createPagSeguroCheckout } from '../services/pagseguro';
+import { createPreference } from '../services/mercadoPago';
 
 export default function Checkout({ onComplete }: { onComplete: (id: string) => void }) {
   const { courseId } = useParams();
@@ -71,7 +71,7 @@ export default function Checkout({ onComplete }: { onComplete: (id: string) => v
     const finalPrice = calculateTotal();
     
     try {
-      const checkoutUrl = await createPagSeguroCheckout(course, user, finalPrice);
+      const preferenceId = await createPreference(course, user, finalPrice);
       
       // Registrar intenção de compra no banco
       await supabase.from('sales').insert({
@@ -79,13 +79,15 @@ export default function Checkout({ onComplete }: { onComplete: (id: string) => v
         course_id: course.id,
         amount: finalPrice,
         status: 'Iniciado',
+        mp_preference_id: preferenceId,
         coupon_code: appliedCoupon?.code || null
       });
 
-      // Redirecionar para o PagSeguro
-      window.location.href = checkoutUrl;
+      // Abrir checkout do Mercado Pago
+      const mp = new (window as any).MercadoPago(user.user_metadata?.mp_public_key || 'APP_USR-70131102-0943-4e4b-97e3-085e35384666'); // Fallback ou do perfil
+      window.location.href = `https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=${preferenceId}`;
     } catch (err: any) {
-      alert("Erro PagSeguro: " + err.message);
+      alert("Erro Mercado Pago: " + err.message);
     } finally {
       setIsGenerating(false);
     }
@@ -97,40 +99,40 @@ export default function Checkout({ onComplete }: { onComplete: (id: string) => v
   return (
     <div className="bg-slate-50 min-h-screen py-12">
       <div className="max-w-4xl mx-auto px-4">
-        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-slate-500 font-medium mb-8 hover:text-indigo-600 group">
+        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-slate-500 font-medium mb-8 hover:text-indigo-600 group transition-colors">
           <ChevronLeft size={20} /> Voltar
         </button>
 
         <div className="bg-white rounded-[40px] shadow-2xl border border-slate-200 overflow-hidden flex flex-col md:flex-row">
           <div className="flex-1 p-12 bg-slate-900 text-white">
-            <h2 className="text-3xl font-black mb-8">Checkout Seguro</h2>
+            <h2 className="text-3xl font-black mb-8 italic uppercase tracking-tighter">Pagamento Seguro</h2>
             <div className="space-y-6">
               <div className="flex justify-between items-center p-6 bg-white/5 rounded-2xl border border-white/10">
                 <span className="text-sm font-bold">{course.title}</span>
                 <span className="font-black text-indigo-400">R$ {calculateTotal().toFixed(2)}</span>
               </div>
               <div className="flex items-center gap-3 text-emerald-400 text-[10px] font-black uppercase tracking-widest">
-                <ShieldCheck size={16} /> Protegido por PagSeguro UOL
+                <ShieldCheck size={16} /> Protegido por Mercado Pago
               </div>
             </div>
           </div>
 
           <div className="flex-1 p-12 bg-white flex flex-col justify-center">
             <div className="mb-10 text-center">
-              <img src="https://logodownload.org/wp-content/uploads/2014/10/pagseguro-logo-1.png" className="h-6 mx-auto mb-4" alt="PagSeguro" />
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Plataforma de Pagamento Oficial</p>
+              <img src="https://logodownload.org/wp-content/uploads/2017/06/mercado-pago-logo-1.png" className="h-6 mx-auto mb-4" alt="Mercado Pago" />
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Gateway de Transação Certificado</p>
             </div>
 
             <button 
               onClick={handleStartPayment}
               disabled={isGenerating}
-              className="w-full bg-[#f37021] text-white py-6 rounded-3xl font-black text-xl hover:bg-[#d9641d] transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
+              className="w-full bg-[#009ee3] text-white py-6 rounded-3xl font-black text-xl hover:bg-[#0081ba] transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50 shadow-xl shadow-blue-100"
             >
-              {isGenerating ? <Loader2 className="animate-spin" /> : <>PAGAR COM PAGSEGURO <ArrowRight size={20} /></>}
+              {isGenerating ? <Loader2 className="animate-spin" /> : <>PAGAR COM MERCADO PAGO <ArrowRight size={20} /></>}
             </button>
             
             <p className="mt-8 text-[9px] text-slate-400 font-bold uppercase text-center leading-relaxed">
-              Ao clicar em pagar, você será redirecionado para o ambiente seguro do PagSeguro UOL para finalizar sua transação.
+              Pagamento processado em ambiente criptografado. Seus dados estão 100% seguros.
             </p>
           </div>
         </div>

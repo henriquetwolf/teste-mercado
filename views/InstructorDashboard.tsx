@@ -21,8 +21,8 @@ import {
   Clock,
   ChevronRight,
   ArrowLeft,
-  Mail,
-  Key
+  Key,
+  Lock
 } from 'lucide-react';
 
 const SidebarBtn = ({ active, onClick, icon, label }: any) => (
@@ -58,17 +58,14 @@ export default function InstructorDashboard() {
   const [isSaving, setIsSaving] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // Stats
   const [stats, setStats] = useState({ totalRevenue: 0, totalStudents: 0, activeCourses: 0 });
 
-  // PagSeguro Config
   const [paymentConfig, setPaymentConfig] = useState({
-    gateway: 'pagseguro',
-    pagseguroEmail: '',
-    pagseguroToken: ''
+    gateway: 'mercadopago',
+    mercadopagoPublicKey: '',
+    mercadopagoAccessToken: ''
   });
 
-  // Novo Curso State
   const [newCourse, setNewCourse] = useState({
     title: '',
     description: '',
@@ -156,7 +153,7 @@ export default function InstructorDashboard() {
       setEditingCourse(data);
       setActiveTab('edit-course');
     } catch (err: any) {
-      alert("Erro ao criar curso. Verifique se as tabelas do banco foram criadas corretamente via SQL Editor.");
+      alert("Erro ao criar curso. Verifique se as tabelas do banco foram criadas corretamente.");
     } finally {
       setIsSaving(false);
     }
@@ -172,7 +169,7 @@ export default function InstructorDashboard() {
         .eq('id', user.id);
       
       if (error) throw error;
-      alert("Configurações do PagSeguro salvas!");
+      alert("Configurações do Mercado Pago salvas!");
     } catch (err: any) {
       alert("Erro ao salvar: " + err.message);
     } finally {
@@ -222,7 +219,7 @@ export default function InstructorDashboard() {
         .eq('id', editingCourse.id);
       
       if (error) throw error;
-      alert("Curso atualizado!");
+      alert("Curso atualizado com sucesso!");
       loadInstructorData();
       setActiveTab('courses');
     } catch (err: any) {
@@ -243,14 +240,14 @@ export default function InstructorDashboard() {
           </div>
           <div>
             <h2 className="text-xl font-black italic tracking-tighter text-white uppercase">Prof. Hub</h2>
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-[0.2em]">PagSeguro LMS</p>
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-[0.2em]">Mercado Pago LMS</p>
           </div>
         </div>
 
         <nav className="space-y-3">
           <SidebarBtn active={activeTab === 'overview'} onClick={() => setActiveTab('overview')} icon={<LayoutDashboard size={18} />} label="Resultados" />
           <SidebarBtn active={activeTab === 'courses' || activeTab === 'edit-course'} onClick={() => setActiveTab('courses')} icon={<BookOpen size={18} />} label="Meus Cursos" />
-          <SidebarBtn active={activeTab === 'marketplace'} onClick={() => setActiveTab('marketplace')} icon={<CreditCard size={18} />} label="PagSeguro" />
+          <SidebarBtn active={activeTab === 'marketplace'} onClick={() => setActiveTab('marketplace')} icon={<CreditCard size={18} />} label="Mercado Pago" />
         </nav>
       </div>
 
@@ -259,7 +256,7 @@ export default function InstructorDashboard() {
           <div className="space-y-12 animate-fade-in">
             <header>
               <h1 className="text-4xl font-black text-slate-900 tracking-tight italic uppercase">Minha Performance</h1>
-              <p className="text-slate-500 font-medium text-sm">Vendas processadas via PagSeguro.</p>
+              <p className="text-slate-500 font-medium text-sm">Vendas processadas via Mercado Pago.</p>
             </header>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <StatCard label="Receita Bruta" value={`R$ ${stats.totalRevenue.toLocaleString()}`} icon={<DollarSign className="text-indigo-500" />} trend="Total vendido" />
@@ -272,28 +269,28 @@ export default function InstructorDashboard() {
           <div className="max-w-3xl animate-fade-in space-y-8">
             <header>
               <div className="flex items-center gap-4 mb-2">
-                 <img src="https://logodownload.org/wp-content/uploads/2014/10/pagseguro-logo-1.png" className="h-8" alt="PagSeguro" />
+                 <img src="https://logodownload.org/wp-content/uploads/2017/06/mercado-pago-logo-1.png" className="h-8" alt="Mercado Pago" />
               </div>
-              <h1 className="text-3xl font-black text-slate-900 italic uppercase">Recebimento PagSeguro</h1>
-              <p className="text-slate-500 font-medium">Configure sua conta PagSeguro para receber pelas vendas.</p>
+              <h1 className="text-3xl font-black text-slate-900 italic uppercase">Configurar Mercado Pago</h1>
+              <p className="text-slate-500 font-medium">Insira suas credenciais para receber os pagamentos diretamente.</p>
             </header>
             <div className="bg-white p-10 rounded-[40px] border border-slate-200 shadow-sm space-y-8">
                <div className="space-y-6">
                   <div>
-                      <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">E-mail da Conta PagSeguro</label>
+                      <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">Public Key</label>
                       <div className="relative">
-                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input type="email" value={paymentConfig.pagseguroEmail} onChange={e => setPaymentConfig({...paymentConfig, pagseguroEmail: e.target.value})} className="w-full p-4 pl-12 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" placeholder="exemplo@email.com" />
+                        <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <input type="text" value={paymentConfig.mercadopagoPublicKey} onChange={e => setPaymentConfig({...paymentConfig, mercadopagoPublicKey: e.target.value})} className="w-full p-4 pl-12 bg-slate-50 border border-slate-200 rounded-2xl font-mono text-xs outline-none" placeholder="APP_USR-..." />
                       </div>
                   </div>
                   <div>
-                      <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">Token de Segurança PagSeguro</label>
+                      <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">Access Token</label>
                       <div className="relative">
-                        <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input type="password" value={paymentConfig.pagseguroToken} onChange={e => setPaymentConfig({...paymentConfig, pagseguroToken: e.target.value})} className="w-full p-4 pl-12 bg-slate-50 border border-slate-200 rounded-2xl font-mono text-xs outline-none" placeholder="Token alfanumérico..." />
+                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <input type="password" value={paymentConfig.mercadopagoAccessToken} onChange={e => setPaymentConfig({...paymentConfig, mercadopagoAccessToken: e.target.value})} className="w-full p-4 pl-12 bg-slate-50 border border-slate-200 rounded-2xl font-mono text-xs outline-none" placeholder="APP_USR-..." />
                       </div>
                       <p className="mt-4 text-[9px] text-slate-400 font-bold uppercase leading-relaxed">
-                        Para obter seu token: Acesse sua conta PagSeguro > Configurações > Integrações > Gerar Token.
+                        Obtenha em: Suas Integrações &gt; Credenciais de Produção.
                       </p>
                   </div>
                </div>
@@ -340,10 +337,9 @@ export default function InstructorDashboard() {
            </div>
         )}
 
-        {/* ... Modal Novo Curso & Editor de Conteúdo permanecem iguais à versão anterior, focando no objeto editingCourse ... */}
         {activeTab === 'edit-course' && editingCourse && (
           <div className="space-y-12 animate-fade-in pb-20">
-             <button onClick={() => setActiveTab('courses')} className="flex items-center gap-2 text-slate-500 font-black text-xs uppercase hover:text-indigo-600">
+             <button onClick={() => setActiveTab('courses')} className="flex items-center gap-2 text-slate-500 font-black text-xs uppercase hover:text-indigo-600 transition-colors">
                 <ArrowLeft size={16} /> Voltar
              </button>
              <div className="flex flex-col lg:flex-row justify-between items-start gap-12">
@@ -352,7 +348,9 @@ export default function InstructorDashboard() {
                    <div className="space-y-6">
                       <div className="flex justify-between items-center">
                          <h3 className="text-xl font-black italic uppercase tracking-tighter">Estrutura de Ensino</h3>
-                         <button onClick={handleAddModule} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2"><Plus size={14} /> Add Módulo</button>
+                         <button onClick={handleAddModule} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2">
+                            <Plus size={14} /> Add Módulo
+                         </button>
                       </div>
                       <div className="space-y-8">
                          {editingCourse.modules?.map((module: any, mIdx: number) => (
@@ -382,7 +380,7 @@ export default function InstructorDashboard() {
                 <div className="w-full lg:w-96 shrink-0 sticky top-32">
                    <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-8">
                       <button onClick={handleSaveCourseContent} disabled={isSaving} className="w-full bg-slate-900 text-white py-6 rounded-3xl font-black text-lg hover:bg-slate-800 transition-all flex items-center justify-center gap-3">
-                         {isSaving ? <Loader2 className="animate-spin" /> : <><Save size={20} /> Salvar Curso</>}
+                         {isSaving ? <Loader2 className="animate-spin" /> : <><Save size={20} /> Salvar Alterações</>}
                       </button>
                    </div>
                 </div>
