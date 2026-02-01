@@ -39,7 +39,7 @@ export default function Admin() {
     title: '',
     instructor: '',
     price: 0,
-    thumbnail: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&q=80',
+    thumbnail: '',
     description: '',
     payment_link: '', 
     modules: [] as any[]
@@ -70,31 +70,54 @@ export default function Admin() {
     e.preventDefault();
     setIsSaving(true);
     try {
-      await supabase.from('courses').upsert({
+      const { data, error } = await supabase.from('courses').upsert({
         id: editingCourse?.id || undefined,
-        ...courseForm,
-        rating: 5.0,
-        students: 0
-      });
-      alert("Curso atualizado!");
+        title: courseForm.title,
+        instructor: courseForm.instructor,
+        price: courseForm.price,
+        thumbnail: courseForm.thumbnail,
+        description: courseForm.description,
+        payment_link: courseForm.payment_link,
+        modules: courseForm.modules,
+        rating: 5.0
+      }, { onConflict: 'id' });
+
+      if (error) throw error;
+
+      alert("Curso salvo e atualizado com sucesso!");
       setEditingCourse(null);
       fetchData();
     } catch (err: any) {
-      alert("Erro ao salvar curso.");
+      console.error("Save error:", err);
+      alert(`Erro ao salvar curso: ${err.message || 'Verifique se a coluna payment_link existe no SQL Editor do Supabase.'}`);
+    } finally {
+      setIsSaving(false);
     }
-    setIsSaving(false);
+  };
+
+  const deleteCourse = async (id: string) => {
+    if (!confirm("Tem certeza que deseja excluir este curso?")) return;
+    try {
+      const { error } = await supabase.from('courses').delete().eq('id', id);
+      if (error) throw error;
+      fetchData();
+    } catch (err: any) {
+      alert("Erro ao excluir curso.");
+    }
   };
 
   const saveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
     try {
-      await supabase.from('platform_settings').upsert({ key: 'mercadopago_config', value: mpConfig }, { onConflict: 'key' });
-      alert("Configurações do Mercado Pago salvas com sucesso!");
-    } catch (err) {
-      alert("Erro ao salvar configurações.");
+      const { error } = await supabase.from('platform_settings').upsert({ key: 'mercadopago_config', value: mpConfig }, { onConflict: 'key' });
+      if (error) throw error;
+      alert("Configurações do Mercado Pago salvas!");
+    } catch (err: any) {
+      alert(`Erro ao salvar: ${err.message}`);
+    } finally {
+      setIsSaving(false);
     }
-    setIsSaving(false);
   };
 
   return (
@@ -108,16 +131,16 @@ export default function Admin() {
           </div>
         </div>
         <nav className="p-4 flex-grow space-y-2">
-          <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'dashboard' ? 'bg-sky-600' : 'text-slate-400 hover:bg-slate-800'}`}>
+          <button onClick={() => { setActiveTab('dashboard'); setEditingCourse(null); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'dashboard' ? 'bg-sky-600' : 'text-slate-400 hover:bg-slate-800'}`}>
             <BarChart3 size={20} /> Dashboard
           </button>
-          <button onClick={() => setActiveTab('courses')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'courses' ? 'bg-sky-600' : 'text-slate-400 hover:bg-slate-800'}`}>
+          <button onClick={() => { setActiveTab('courses'); setEditingCourse(null); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'courses' ? 'bg-sky-600' : 'text-slate-400 hover:bg-slate-800'}`}>
             <BookOpen size={20} /> Cursos
           </button>
-          <button onClick={() => setActiveTab('sales')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'sales' ? 'bg-sky-600' : 'text-slate-400 hover:bg-slate-800'}`}>
+          <button onClick={() => { setActiveTab('sales'); setEditingCourse(null); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'sales' ? 'bg-sky-600' : 'text-slate-400 hover:bg-slate-800'}`}>
             <CreditCard size={20} /> Transações
           </button>
-          <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'settings' ? 'bg-sky-600' : 'text-slate-400 hover:bg-slate-800'}`}>
+          <button onClick={() => { setActiveTab('settings'); setEditingCourse(null); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'settings' ? 'bg-sky-600' : 'text-slate-400 hover:bg-slate-800'}`}>
             <Wallet size={20} /> Mercado Pago
           </button>
         </nav>
@@ -192,16 +215,6 @@ export default function Admin() {
                       <ShieldCheck size={200} />
                     </div>
                   </div>
-
-                  <div className="bg-sky-50 border border-sky-100 p-8 rounded-[32px] flex gap-4">
-                     <Info className="text-sky-600 shrink-0" size={24} />
-                     <div>
-                        <h4 className="font-bold text-sky-900 mb-1 uppercase text-xs tracking-widest">Aviso sobre Webhooks</h4>
-                        <p className="text-[11px] text-sky-700 leading-relaxed font-medium">
-                          Para que o curso seja liberado <strong>automaticamente</strong> após o pagamento, você deve configurar a URL de Webhook no painel do Mercado Pago apontando para sua Edge Function no Supabase. Caso contrário, a liberação deverá ser manual na aba "Transações".
-                        </p>
-                     </div>
-                  </div>
                 </div>
               </div>
             )}
@@ -225,7 +238,7 @@ export default function Admin() {
                             </label>
                             <input 
                               type="url"
-                              value={courseForm.payment_link} 
+                              value={courseForm.payment_link || ''} 
                               onChange={e => setCourseForm({...courseForm, payment_link: e.target.value})} 
                               className="w-full p-4 bg-white border border-sky-200 rounded-2xl outline-none text-xs font-mono focus:shadow-lg transition-all" 
                               placeholder="https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=..."
@@ -261,7 +274,7 @@ export default function Admin() {
                         <div className="aspect-video relative overflow-hidden">
                           <img src={course.thumbnail} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                           <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-[10px] font-black text-sky-600 shadow-sm">
-                            R$ {course.price.toFixed(2)}
+                            R$ {(course.price || 0).toFixed(2)}
                           </div>
                         </div>
                         <div className="p-8">
@@ -271,9 +284,17 @@ export default function Admin() {
                               <div className="flex gap-2">
                                 <button onClick={() => {
                                   setEditingCourse(course);
-                                  setCourseForm({...course, modules: course.modules || []});
+                                  setCourseForm({
+                                    title: course.title || '',
+                                    instructor: course.instructor || '',
+                                    price: course.price || 0,
+                                    thumbnail: course.thumbnail || '',
+                                    description: course.description || '',
+                                    payment_link: course.payment_link || '',
+                                    modules: course.modules || []
+                                  });
                                 }} className="p-3 bg-sky-50 text-sky-600 hover:bg-sky-600 hover:text-white rounded-xl transition-all"><Edit3 size={18}/></button>
-                                <button className="p-3 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-xl transition-all"><Trash2 size={18}/></button>
+                                <button onClick={() => deleteCourse(course.id)} className="p-3 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-xl transition-all"><Trash2 size={18}/></button>
                               </div>
                               <div className={`w-3 h-3 rounded-full ${course.payment_link ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-amber-500 animate-pulse'}`} title={course.payment_link ? 'Checkout configurado' : 'Link pendente'}></div>
                            </div>
@@ -293,7 +314,6 @@ export default function Admin() {
                           <th className="px-8 py-6">Aluno</th>
                           <th className="px-8 py-6">Valor</th>
                           <th className="px-8 py-6">Status</th>
-                          <th className="px-8 py-6 text-right">Ações</th>
                        </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -312,13 +332,10 @@ export default function Admin() {
                                    {sale.status || 'Pendente'}
                                 </span>
                              </td>
-                             <td className="px-8 py-6 text-right">
-                                <button className="text-sky-600 font-black text-[10px] uppercase hover:underline">Ver Detalhes</button>
-                             </td>
                           </tr>
                        ))}
                        {sales.length === 0 && (
-                         <tr><td colSpan={5} className="p-20 text-center text-slate-400 font-medium italic">Nenhuma transação registrada ainda.</td></tr>
+                         <tr><td colSpan={4} className="p-20 text-center text-slate-400 font-medium italic">Nenhuma transação registrada ainda.</td></tr>
                        )}
                     </tbody>
                  </table>
