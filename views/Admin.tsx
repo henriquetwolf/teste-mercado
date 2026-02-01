@@ -15,11 +15,6 @@ import {
   Loader2, 
   Edit3, 
   Key,
-  AlertTriangle,
-  Info,
-  Globe,
-  PlusCircle,
-  Play,
   Link as LinkIcon,
   Wallet,
   ExternalLink,
@@ -69,27 +64,33 @@ export default function Admin() {
   const saveCourse = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
+    
+    // Log para depuração no console do navegador
+    console.log("Tentando salvar curso com link:", courseForm.payment_link);
+
     try {
-      const { data, error } = await supabase.from('courses').upsert({
+      const payload = {
         id: editingCourse?.id || undefined,
         title: courseForm.title,
         instructor: courseForm.instructor,
         price: courseForm.price,
         thumbnail: courseForm.thumbnail,
         description: courseForm.description,
-        payment_link: courseForm.payment_link,
+        payment_link: courseForm.payment_link, // Campo crucial
         modules: courseForm.modules,
         rating: 5.0
-      }, { onConflict: 'id' });
+      };
+
+      const { data, error } = await supabase.from('courses').upsert(payload, { onConflict: 'id' });
 
       if (error) throw error;
 
-      alert("Curso salvo e atualizado com sucesso!");
+      alert("Dados salvos com sucesso no Banco de Dados!");
       setEditingCourse(null);
-      fetchData();
+      await fetchData(); // Recarregar lista
     } catch (err: any) {
-      console.error("Save error:", err);
-      alert(`Erro ao salvar curso: ${err.message || 'Verifique se a coluna payment_link existe no SQL Editor do Supabase.'}`);
+      console.error("Erro detalhado ao salvar:", err);
+      alert(`Erro: ${err.message}. Certifique-se de ter rodado o SQL para adicionar a coluna 'payment_link'.`);
     } finally {
       setIsSaving(false);
     }
@@ -187,13 +188,6 @@ export default function Admin() {
                     </div>
                   </div>
 
-                  <div className="bg-emerald-50 border border-emerald-100 p-6 rounded-2xl flex gap-4">
-                     <CheckCircle2 className="text-emerald-500 shrink-0" size={20} />
-                     <p className="text-xs text-emerald-800 leading-relaxed">
-                        Ao usar suas chaves de <strong>Produção</strong>, os pagamentos feitos pelos alunos cairão diretamente no saldo da sua conta do Mercado Pago.
-                     </p>
-                  </div>
-
                   <button type="submit" disabled={isSaving} className="w-full bg-sky-600 text-white py-5 rounded-2xl font-black text-lg hover:bg-sky-700 transition-all shadow-xl shadow-sky-100 flex items-center justify-center gap-2">
                      {isSaving ? <Loader2 className="animate-spin" /> : <><Save size={20} /> Salvar Chaves</>}
                   </button>
@@ -204,15 +198,10 @@ export default function Admin() {
                     <div className="relative z-10">
                       <h3 className="text-xl font-bold mb-4">Como receber meus pagamentos?</h3>
                       <ol className="space-y-4 text-sm text-slate-400 list-decimal ml-4">
-                        <li>Acesse o <a href="https://www.mercadopago.com.br/developers/panel" target="_blank" className="text-sky-400 underline font-bold inline-flex items-center gap-1">Painel de Desenvolvedores <ExternalLink size={12}/></a> do Mercado Pago.</li>
-                        <li>Crie uma "Aplicação" para sua escola online.</li>
+                        <li>Acesse o <a href="https://www.mercadopago.com.br/developers/panel" target="_blank" className="text-sky-400 underline font-bold inline-flex items-center gap-1">Painel MP <ExternalLink size={12}/></a>.</li>
                         <li>Copie as <strong>Credenciais de Produção</strong>.</li>
-                        <li>Cole no formulário ao lado e salve.</li>
-                        <li>Crie um "Botão/Link de Pagamento" no painel do MP para cada curso e cole a URL nas configurações do curso aqui no EduAdmin.</li>
+                        <li>Crie um "Botão/Link de Pagamento" para cada curso no painel do MP e cole a URL nas configurações do curso abaixo.</li>
                       </ol>
-                    </div>
-                    <div className="absolute -right-10 -bottom-10 opacity-10">
-                      <ShieldCheck size={200} />
                     </div>
                   </div>
                 </div>
@@ -241,9 +230,9 @@ export default function Admin() {
                               value={courseForm.payment_link || ''} 
                               onChange={e => setCourseForm({...courseForm, payment_link: e.target.value})} 
                               className="w-full p-4 bg-white border border-sky-200 rounded-2xl outline-none text-xs font-mono focus:shadow-lg transition-all" 
-                              placeholder="https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=..."
+                              placeholder="https://www.mercadopago.com.br/..."
                             />
-                            <p className="text-[9px] text-sky-500 mt-3 font-bold uppercase tracking-tighter">Gerado no menu "Botões e Links de Pagamento" do Mercado Pago.</p>
+                            <p className="text-[9px] text-sky-500 mt-3 font-bold uppercase tracking-tighter">Cole o link gerado no site do Mercado Pago aqui.</p>
                           </div>
                        </div>
                        <div className="space-y-6">
@@ -279,7 +268,7 @@ export default function Admin() {
                         </div>
                         <div className="p-8">
                            <h3 className="font-black text-slate-900 mb-2 text-lg line-clamp-1">{course.title}</h3>
-                           <p className="text-xs text-slate-400 mb-6 font-medium">{course.instructor || 'Instrutor Padrão'}</p>
+                           <p className="text-xs text-slate-400 mb-6 font-medium">{course.instructor || 'Instrutor'}</p>
                            <div className="flex justify-between items-center pt-6 border-t border-slate-50">
                               <div className="flex gap-2">
                                 <button onClick={() => {
@@ -296,7 +285,7 @@ export default function Admin() {
                                 }} className="p-3 bg-sky-50 text-sky-600 hover:bg-sky-600 hover:text-white rounded-xl transition-all"><Edit3 size={18}/></button>
                                 <button onClick={() => deleteCourse(course.id)} className="p-3 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-xl transition-all"><Trash2 size={18}/></button>
                               </div>
-                              <div className={`w-3 h-3 rounded-full ${course.payment_link ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-amber-500 animate-pulse'}`} title={course.payment_link ? 'Checkout configurado' : 'Link pendente'}></div>
+                              <div className={`w-3 h-3 rounded-full ${course.payment_link ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-amber-500 animate-pulse'}`}></div>
                            </div>
                         </div>
                      </div>
@@ -334,9 +323,6 @@ export default function Admin() {
                              </td>
                           </tr>
                        ))}
-                       {sales.length === 0 && (
-                         <tr><td colSpan={4} className="p-20 text-center text-slate-400 font-medium italic">Nenhuma transação registrada ainda.</td></tr>
-                       )}
                     </tbody>
                  </table>
               </div>
@@ -357,13 +343,6 @@ export default function Admin() {
                    </div>
                    <div className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2">Total de Alunos</div>
                    <div className="text-4xl font-black text-slate-900">{sales.length}</div>
-                </div>
-                <div className="bg-white p-10 rounded-[40px] border border-slate-200 shadow-sm group hover:border-amber-200 transition-all hover:-translate-y-1">
-                   <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform shadow-sm">
-                      <BookOpen size={32} />
-                   </div>
-                   <div className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2">Catálogo de Cursos</div>
-                   <div className="text-4xl font-black text-slate-900">{courses.length}</div>
                 </div>
               </div>
             )}
