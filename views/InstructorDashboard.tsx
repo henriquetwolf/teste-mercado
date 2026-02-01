@@ -338,8 +338,8 @@ export default function InstructorDashboard() {
                          </div>
                          <ol className="text-[11px] font-medium space-y-2 opacity-80 list-decimal ml-4">
                             <li>Acesse seu painel do Mercado Pago.</li>
-                            <li>Vá em <b>Seu Negócio</b> > <b>Configurações</b>.</li>
-                            <li>Ou acesse <a href="https://www.mercadopago.com.br/developers/panel" target="_blank" className="underline text-blue-400">developers/panel</a> e seu User ID estará visível no canto superior.</li>
+                            <li>Vá em <b>Seu Negócio</b> &gt; <b>Configurações</b>.</li>
+                            <li>Ou acesse <a href="https://www.mercadopago.com.br/developers/panel" target="_blank" rel="noopener noreferrer" className="underline text-blue-400">developers/panel</a> e seu User ID estará visível no canto superior.</li>
                          </ol>
                       </div>
                   </div>
