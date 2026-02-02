@@ -1,77 +1,61 @@
 
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
-import { 
-  GraduationCap, 
-  LogOut, 
-  Loader2, 
-  Shield, 
-  Presentation
-} from 'lucide-react';
+import { GraduationCap, User, ShoppingCart, Settings, LogOut, Loader2, AlertTriangle, Database, ExternalLink, Shield } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from './services/supabase';
-import Home from './views/Home';
-import CourseDetails from './views/CourseDetails';
-import Classroom from './views/Classroom';
-import Checkout from './views/Checkout';
-import MyCourses from './views/MyCourses';
-import Admin from './views/Admin';
-import Auth from './views/Auth';
-import InstructorDashboard from './views/InstructorDashboard';
+import Home from './views/Home.tsx';
+import CourseDetails from './views/CourseDetails.tsx';
+import Classroom from './views/Classroom.tsx';
+import Checkout from './views/Checkout.tsx';
+import MyCourses from './views/MyCourses.tsx';
+import Admin from './views/Admin.tsx';
+import Auth from './views/Auth.tsx';
+import { COURSES } from './constants';
 
 const ADMIN_EMAIL = 'wolf@wolf.com';
 
-const Header = ({ user }: { user: any }) => {
+const Header = ({ cartCount, user }: { cartCount: number, user: any }) => {
   const handleLogout = () => supabase.auth.signOut();
   const isAdmin = user?.email === ADMIN_EMAIL;
 
   return (
-    <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+    <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-20">
-          <div className="flex items-center gap-8">
-            <Link to="/" className="flex items-center gap-2 text-indigo-600 font-black text-2xl italic tracking-tighter">
-              <GraduationCap className="w-10 h-10" />
-              <span>EDUVANTAGE</span>
-            </Link>
+        <div className="flex justify-between items-center h-16">
+          <Link to="/" className="flex items-center gap-2 text-sky-600 font-bold text-xl">
+            < GraduationCap className="w-8 h-8" />
+            <span>EduVantage</span>
+          </Link>
+
+          <div className="flex items-center gap-4 md:gap-8 text-slate-600 font-medium">
+            <Link to="/" className="hidden md:block hover:text-sky-600 transition-colors">Explorar</Link>
             
-            <nav className="hidden lg:flex items-center gap-6 text-slate-500 font-bold text-xs uppercase tracking-widest">
-              <Link to="/" className="hover:text-indigo-600 transition-colors">Explorar</Link>
-              {user && <Link to="/my-courses" className="hover:text-indigo-600 transition-colors">Meus Cursos</Link>}
-            </nav>
-          </div>
-
-          <div className="flex items-center gap-4">
-            {user ? (
-              <>
-                <div className="flex items-center gap-2">
-                  {isAdmin && (
-                    <Link to="/admin" className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-[10px] font-black hover:bg-slate-800 transition-all border border-slate-700">
-                      <Shield size={14} className="text-amber-400" />
-                      MASTER ADMIN
-                    </Link>
-                  )}
-                  <Link to="/instructor" className="flex items-center gap-2 bg-indigo-50 text-indigo-600 px-4 py-2 rounded-xl text-[10px] font-black hover:bg-indigo-100 transition-all border border-indigo-100">
-                    <Presentation size={14} />
-                    PROFESSOR
-                  </Link>
-                </div>
-
-                <div className="h-8 w-[1px] bg-slate-200 mx-2"></div>
-
-                <div className="flex items-center gap-4">
-                  <button onClick={handleLogout} className="text-slate-400 hover:text-rose-600 p-2 transition-colors" title="Sair">
-                    <LogOut size={20} />
-                  </button>
-                  <div className="w-10 h-10 rounded-full bg-slate-100 border-2 border-white shadow-sm flex items-center justify-center font-black text-indigo-600 text-xs uppercase">
-                    {user.email?.charAt(0)}
+            <div className="flex items-center gap-4">
+              {user ? (
+                <>
+                  <Link to="/my-courses" className="hover:text-sky-600 transition-colors">Meus Cursos</Link>
+                  <div className="relative">
+                    <ShoppingCart className="w-6 h-6 text-slate-400" />
+                    {cartCount > 0 && <span className="absolute -top-2 -right-2 bg-sky-600 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">{cartCount}</span>}
                   </div>
-                </div>
-              </>
-            ) : (
-              <Link to="/auth" className="bg-indigo-600 text-white px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95">
-                Entrar na Plataforma
-              </Link>
-            )}
+                  <div className="flex items-center gap-3 border-l pl-6 border-slate-200">
+                    {isAdmin && (
+                      <Link to="/admin" className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-slate-800 transition-all shadow-sm">
+                        <Shield size={14} className="text-sky-400" />
+                        Admin
+                      </Link>
+                    )}
+                    <button onClick={handleLogout} className="text-slate-400 hover:text-rose-600 transition-colors p-2" title="Sair">
+                      <LogOut size={20} />
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <Link to="/auth" className="bg-sky-600 text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all">
+                  Entrar
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -80,6 +64,7 @@ const Header = ({ user }: { user: any }) => {
 };
 
 export default function App() {
+  const [cart, setCart] = useState<string[]>([]);
   const [user, setUser] = useState<any>(null);
   const [initializing, setInitializing] = useState(true);
 
@@ -92,6 +77,9 @@ export default function App() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setInitializing(false);
+    }).catch(err => {
+      console.error("Supabase Session Error:", err);
+      setInitializing(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -103,40 +91,48 @@ export default function App() {
 
   if (initializing) {
     return (
-      <div className="h-screen flex items-center justify-center bg-white">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="animate-spin text-indigo-600" size={48} />
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Carregando Ecossistema...</p>
-        </div>
+      <div className="h-screen flex items-center justify-center bg-slate-50">
+        <Loader2 className="animate-spin text-sky-600" size={40} />
       </div>
     );
   }
 
+  const onPurchaseComplete = async (courseId: string) => {
+    if (!user) return;
+    const course = COURSES.find(c => c.id === courseId);
+    try {
+      await supabase.from('sales').insert({
+        user_id: user.id,
+        course_id: courseId,
+        amount: course?.price || 0,
+        status: 'Pendente',
+        payment_method: 'Mercado Pago'
+      });
+    } catch (err) {
+      console.error("Purchase registration error:", err);
+    }
+  };
+
+  const isAdmin = user?.email === ADMIN_EMAIL;
+
   return (
     <Router>
-      <div className="min-h-screen flex flex-col bg-slate-50 font-['Inter']">
-        <Header user={user} />
+      <div className="min-h-screen flex flex-col bg-slate-50">
+        <Header cartCount={cart.length} user={user} />
         <main className="flex-grow">
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/course/:id" element={<CourseDetails onAddToCart={() => {}} />} />
+            <Route path="/course/:id" element={<CourseDetails onAddToCart={(id) => !cart.includes(id) && setCart([...cart, id])} />} />
             <Route path="/classroom/:courseId" element={user ? <Classroom /> : <Navigate to="/auth" />} />
-            <Route path="/checkout/:courseId" element={user ? <Checkout onComplete={() => {}} /> : <Navigate to="/auth" />} />
+            <Route path="/checkout/:courseId" element={user ? <Checkout onComplete={onPurchaseComplete} /> : <Navigate to="/auth" />} />
             <Route path="/my-courses" element={user ? <MyCourses /> : <Navigate to="/auth" />} />
-            <Route path="/instructor/*" element={user ? <InstructorDashboard /> : <Navigate to="/auth" />} />
-            <Route path="/admin/*" element={user?.email === ADMIN_EMAIL ? <Admin /> : <Navigate to="/" />} />
+            <Route path="/admin" element={isAdmin ? <Admin /> : <Navigate to="/" />} />
           </Routes>
         </main>
-        <footer className="bg-white border-t border-slate-100 py-12">
-          <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-8">
-            <div className="flex items-center gap-2 text-slate-300 font-black italic">
-              <GraduationCap size={24} />
-              <span>EDUVANTAGE PLATFORM</span>
-            </div>
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">
-              Tecnologia Educacional com Transações Seguras PagSeguro & Mercado Pago.
-            </div>
+        <footer className="bg-slate-900 text-slate-400 py-12">
+          <div className="max-w-7xl mx-auto px-4 text-center text-xs">
+            © 2024 EduVantage. Pagamentos seguros processados por <strong>Mercado Pago</strong>.
           </div>
         </footer>
       </div>

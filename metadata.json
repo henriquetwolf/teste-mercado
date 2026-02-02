@@ -1,6 +1,6 @@
 {
-  "name": "EduVantage - LMS & Mercado Pago Platform",
-  "description": "Uma plataforma moderna de cursos online com tutoria de IA (Gemini) e fluxo de pagamento Mercado Pago com Split de 1% integrado.",
+  "name": "EduVantage - LMS & PagSeguro Learning Platform",
+  "description": "Uma plataforma moderna de cursos online com tutoria de IA (Gemini) e fluxo de pagamento PagSeguro integrado.",
   "requestFramePermissions": [
     "camera",
     "microphone"
