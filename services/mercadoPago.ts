@@ -14,45 +14,20 @@ const getAdminConfig = async () => {
 };
 
 /**
- * Busca o ID de Recebedor (Collector ID) do Professor
- */
-const getInstructorMPId = async (instructorId: string) => {
-  const { data } = await supabase
-    .from('profiles')
-    .select('payment_config')
-    .eq('id', instructorId)
-    .single();
-  
-  return data?.payment_config?.mercadopagoUserId || null;
-};
-
-/**
- * Cria a preferência de pagamento com SPLIT REAL.
+ * Cria a preferência de pagamento DIRETO para o Admin.
+ * 100% do valor cai na conta vinculada ao Access Token do Admin Master.
  */
 export const createPreference = async (course: any, user: any, finalPrice?: number) => {
   try {
     const adminConfig = await getAdminConfig();
-    const instructorRawId = await getInstructorMPId(course.instructor_id);
-    
     const accessToken = adminConfig.accessToken;
     const publicKey = adminConfig.publicKey;
-    const commissionRate = adminConfig.commissionRate || 1;
     
     if (!accessToken) {
-      throw new Error("Configuração de pagamento incompleta: Admin não configurado.");
+      throw new Error("Sistema de pagamentos não configurado pelo administrador.");
     }
 
-    // Validação rigorosa do ID do Professor
-    const collectorId = parseInt(instructorRawId || "0", 10);
-    
-    if (isNaN(collectorId) || collectorId <= 0) {
-      throw new Error("O professor deste curso não configurou um User ID válido do Mercado Pago.");
-    }
-
-    const rawPrice = finalPrice !== undefined ? finalPrice : course.price;
-    const price = Number(Number(rawPrice).toFixed(2));
-    const platformFee = Number((price * (commissionRate / 100)).toFixed(2));
-
+    const price = Number(Number(finalPrice !== undefined ? finalPrice : course.price).toFixed(2));
     const baseUrl = window.location.origin + window.location.pathname + (window.location.pathname.endsWith('/') ? '' : '/') + '#/my-courses';
     const externalReference = `${user.id}---${course.id}---${Date.now()}`;
 
@@ -77,17 +52,10 @@ export const createPreference = async (course: any, user: any, finalPrice?: numb
       },
       auto_return: 'approved',
       external_reference: externalReference,
-      marketplace_fee: platformFee, 
-      collector_id: collectorId, // Enviado como número inteiro puro
       statement_descriptor: "EDUVANTAGE",
       binary_mode: true
+      // Nota: marketplace_fee e collector_id removidos para garantir venda direta ao Admin Master.
     };
-
-    console.log("Gerando Preferência MP:", {
-      collector_id: collectorId,
-      fee: platformFee,
-      total: price
-    });
 
     const response = await fetch('https://api.mercadopago.com/checkout/preferences', {
       method: 'POST',
@@ -102,7 +70,7 @@ export const createPreference = async (course: any, user: any, finalPrice?: numb
 
     if (!response.ok) {
       console.error("Erro API Mercado Pago:", responseData);
-      throw new Error(responseData.message || "Erro na API do Mercado Pago ao processar split.");
+      throw new Error(responseData.message || "Erro ao gerar link de pagamento.");
     }
     
     return {

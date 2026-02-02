@@ -9,19 +9,13 @@ import {
   Users, 
   Loader2, 
   Save, 
-  CreditCard,
   Zap,
-  Info,
   X,
   Settings,
   ArrowLeft,
   Trash2,
-  Wallet,
   TrendingUp,
-  History,
-  ExternalLink,
-  ShieldCheck,
-  AlertTriangle
+  ShieldCheck
 } from 'lucide-react';
 
 const SidebarBtn = ({ active, onClick, icon, label }: any) => (
@@ -49,7 +43,7 @@ const StatCard = ({ label, value, icon, trend }: any) => (
 );
 
 export default function InstructorDashboard() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'courses' | 'finance' | 'settings' | 'edit-course'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'courses' | 'edit-course'>('overview');
   const [loading, setLoading] = useState(true);
   const [courses, setCourses] = useState<any[]>([]);
   const [editingCourse, setEditingCourse] = useState<any>(null);
@@ -58,7 +52,6 @@ export default function InstructorDashboard() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [stats, setStats] = useState({ totalRevenue: 0, totalStudents: 0, activeCourses: 0 });
   const [salesList, setSalesList] = useState<any[]>([]);
-  const [mpUserId, setMpUserId] = useState('');
 
   const [newCourse, setNewCourse] = useState({
     title: '',
@@ -88,16 +81,6 @@ export default function InstructorDashboard() {
         setStats(prev => ({ ...prev, activeCourses: coursesData.length }));
       }
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('payment_config')
-        .eq('id', session.user.id)
-        .single();
-      
-      if (profile?.payment_config?.mercadopagoUserId) {
-        setMpUserId(profile.payment_config.mercadopagoUserId.toString());
-      }
-
       const { data: sales } = await supabase
         .from('sales')
         .select(`*, course:courses(title), user:profiles(full_name)`)
@@ -116,33 +99,6 @@ export default function InstructorDashboard() {
       setLoading(false);
     }
   }
-
-  const handleSaveMpSettings = async () => {
-    if (!user) return;
-    
-    // Validação simples do ID
-    if (!mpUserId || mpUserId.length < 5) {
-      alert("Por favor, insira um User ID válido do Mercado Pago (apenas números).");
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ 
-          payment_config: { mercadopagoUserId: mpUserId.replace(/\D/g, '') } 
-        })
-        .eq('id', user.id);
-      
-      if (error) throw error;
-      alert("Sua conta está pronta para receber pagamentos!");
-    } catch (err: any) {
-      alert("Erro ao salvar: " + err.message);
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   const handleCreateCourse = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -257,14 +213,13 @@ export default function InstructorDashboard() {
           </div>
           <div>
             <h2 className="text-xl font-black italic tracking-tighter text-white uppercase">Prof. Hub</h2>
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-[0.2em]">Split Real LMS</p>
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-[0.2em]">EduVantage LMS</p>
           </div>
         </div>
 
         <nav className="space-y-3">
           <SidebarBtn active={activeTab === 'overview'} onClick={() => setActiveTab('overview')} icon={<LayoutDashboard size={18} />} label="Resultados" />
           <SidebarBtn active={activeTab === 'courses' || activeTab === 'edit-course'} onClick={() => setActiveTab('courses')} icon={<BookOpen size={18} />} label="Meus Cursos" />
-          <SidebarBtn active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<CreditCard size={18} />} label="Pagamento" />
         </nav>
       </div>
 
@@ -273,10 +228,10 @@ export default function InstructorDashboard() {
           <div className="space-y-12 animate-fade-in">
             <header>
               <h1 className="text-4xl font-black text-slate-900 tracking-tight italic uppercase">Painel Geral</h1>
-              <p className="text-slate-500 font-medium text-sm">Acompanhe suas vendas em tempo real.</p>
+              <p className="text-slate-500 font-medium text-sm">Acompanhe as vendas dos seus cursos.</p>
             </header>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <StatCard label="Minha Receita" value={`R$ ${stats.totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon={<DollarSign className="text-indigo-500" />} trend="Recebido via Split" />
+              <StatCard label="Vendas Totais" value={`R$ ${stats.totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon={<DollarSign className="text-indigo-500" />} trend="Receita Bruta" />
               <StatCard label="Total Alunos" value={stats.totalStudents.toString()} icon={<Users className="text-sky-500" />} trend="Estudantes" />
               <StatCard label="Cursos" value={stats.activeCourses.toString()} icon={<BookOpen className="text-amber-500" />} trend="Ativos" />
             </div>
@@ -308,75 +263,6 @@ export default function InstructorDashboard() {
                  </table>
                </div>
             </section>
-          </div>
-        )}
-
-        {activeTab === 'settings' && (
-          <div className="max-w-3xl animate-fade-in space-y-12">
-            <header>
-              <h1 className="text-3xl font-black text-slate-900 italic uppercase">Configuração de Recebimento</h1>
-              <p className="text-slate-500 font-medium">O dinheiro das vendas cairá diretamente na sua conta Mercado Pago através do sistema de Split.</p>
-            </header>
-
-            <div className="bg-white p-12 rounded-[48px] border border-slate-200 shadow-sm space-y-8">
-               <div className="flex items-center gap-4 border-b border-slate-50 pb-8">
-                  <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center">
-                    <img src="https://logodownload.org/wp-content/uploads/2017/06/mercado-pago-logo-1.png" className="h-6" alt="MP" />
-                  </div>
-                  <div>
-                    <h3 className="font-black italic uppercase tracking-tighter">Sua Conta de Vendedor</h3>
-                    <p className="text-xs text-slate-400 font-bold uppercase">Integração via Collector ID</p>
-                  </div>
-               </div>
-
-               <div className="space-y-6">
-                  <div>
-                      <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">Seu User ID do Mercado Pago (Apenas Números)</label>
-                      <input 
-                        type="text" 
-                        value={mpUserId} 
-                        onChange={e => setMpUserId(e.target.value.replace(/\D/g, ''))} 
-                        className="w-full p-5 bg-slate-50 border border-slate-200 rounded-2xl font-black text-lg text-slate-900 outline-none focus:ring-4 focus:ring-blue-50" 
-                        placeholder="Ex: 123456789"
-                      />
-                      <div className="mt-6 p-6 bg-slate-950 text-white rounded-[32px] space-y-4">
-                         <div className="flex items-center gap-2 text-blue-400">
-                            <Info size={16} />
-                            <span className="text-[10px] font-black uppercase tracking-widest">Onde encontrar esse número?</span>
-                         </div>
-                         <ol className="text-[11px] font-medium space-y-3 opacity-80 list-decimal ml-4">
-                            <li>Acesse seu painel em <a href="https://www.mercadopago.com.br/developers/panel" target="_blank" rel="noopener noreferrer" className="underline text-blue-400">mercadopago.com.br/developers/panel</a>.</li>
-                            <li>No canto superior direito, clique no seu nome.</li>
-                            <li>O <b>User ID</b> (também chamado de Collector ID) aparecerá logo abaixo do seu e-mail.</li>
-                         </ol>
-                      </div>
-                  </div>
-               </div>
-
-               <div className="p-6 bg-amber-50 border border-amber-100 rounded-3xl flex gap-4">
-                  <AlertTriangle className="text-amber-500 shrink-0" size={20} />
-                  <p className="text-[10px] font-bold text-amber-700 uppercase leading-relaxed">
-                    Certifique-se de que o número está correto. Se o ID for inválido, os alunos não conseguirão completar o checkout dos seus cursos.
-                  </p>
-               </div>
-
-               <button 
-                 onClick={handleSaveMpSettings} 
-                 disabled={isSaving}
-                 className="w-full bg-slate-900 text-white py-6 rounded-3xl font-black text-lg hover:bg-blue-600 transition-all shadow-xl flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
-               >
-                  {isSaving ? <Loader2 className="animate-spin" /> : <><Save size={20} /> Ativar Recebimento Direto</>}
-               </button>
-            </div>
-
-            <div className="bg-emerald-50 p-8 rounded-[40px] border border-emerald-100 flex gap-6 items-center">
-               <div className="w-12 h-12 bg-emerald-500 text-white rounded-2xl flex items-center justify-center shrink-0">
-                  <ShieldCheck size={24} />
-               </div>
-               <p className="text-xs font-bold text-emerald-800 leading-relaxed uppercase tracking-tight">
-                  Sua conta está segura. Ao usar apenas o User ID, a plataforma nunca terá acesso às suas senhas, tokens ou dados bancários privados.
-               </p>
-            </div>
           </div>
         )}
 
